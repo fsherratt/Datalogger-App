@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/connect"
+        android:enabled="true"
+        android:icon="@drawable/ic_bluetooth_black_24dp"
+        android:iconTint="@color/colorWhite"
+        android:title="Connect All"
+        android:visible="true" />
+    <item
+        android:id="@+id/disconnect"
+        android:enabled="true"
+        android:icon="@drawable/ic_bluetooth_disabled_black_24dp"
+        android:iconTint="@color/colorWhite"
+        android:title="Disconnect All"
+        android:visible="true" />
+</menu>
