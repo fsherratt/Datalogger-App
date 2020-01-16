@@ -11,90 +11,90 @@
     android:orientation="vertical">
 
     <Button
-        android:id="@+id/jump_button"
+        android:id="@+id/button_8"
         android:layout_width="174dp"
         android:layout_height="wrap_content"
         android:layout_marginEnd="16dp"
         android:layout_marginBottom="16dp"
         android:onClick="action_label_button"
-        android:text="Jump"
+        android:text="@string/button_8_text"
         app:layout_constraintBottom_toTopOf="@+id/ble_record_button"
         app:layout_constraintEnd_toEndOf="parent" />
 
     <Button
-        android:id="@+id/open_door_button"
+        android:id="@+id/button_7"
         android:layout_width="174dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="16dp"
         android:onClick="action_label_button"
-        android:text="Open Door"
-        app:layout_constraintBottom_toBottomOf="@+id/jump_button"
+        android:text="@string/button_7_text"
+        app:layout_constraintBottom_toBottomOf="@+id/button_8"
         app:layout_constraintStart_toStartOf="parent" />
 
     <Button
-        android:id="@+id/stand_up_button"
+        android:id="@+id/button_6"
         android:layout_width="174dp"
         android:layout_height="wrap_content"
         android:layout_marginEnd="16dp"
         android:layout_marginBottom="8dp"
         android:onClick="action_label_button"
-        android:text="Stand Up"
-        app:layout_constraintBottom_toTopOf="@+id/jump_button"
+        android:text="@string/button_6_text"
+        app:layout_constraintBottom_toTopOf="@+id/button_8"
         app:layout_constraintEnd_toEndOf="parent" />
 
     <Button
-        android:id="@+id/sit_down_button"
+        android:id="@+id/button_5"
         android:layout_width="174dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="16dp"
         android:layout_marginBottom="8dp"
         android:onClick="action_label_button"
-        android:text="Sit Down"
-        app:layout_constraintBottom_toTopOf="@+id/open_door_button"
+        android:text="@string/button_5_text"
+        app:layout_constraintBottom_toTopOf="@+id/button_7"
         app:layout_constraintStart_toStartOf="parent" />
 
     <Button
-        android:id="@+id/stair_down_button"
+        android:id="@+id/button_4"
         android:layout_width="174dp"
         android:layout_height="wrap_content"
         android:layout_marginEnd="16dp"
         android:layout_marginBottom="8dp"
         android:onClick="action_label_button"
-        android:text="Stair Down"
-        app:layout_constraintBottom_toTopOf="@+id/stand_up_button"
+        android:text="@string/button_4_text"
+        app:layout_constraintBottom_toTopOf="@+id/button_6"
         app:layout_constraintEnd_toEndOf="parent" />
 
     <Button
-        android:id="@+id/stair_up_button"
+        android:id="@+id/button_3"
         android:layout_width="174dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="16dp"
         android:layout_marginBottom="8dp"
         android:onClick="action_label_button"
-        android:text="Stair Up"
-        app:layout_constraintBottom_toTopOf="@+id/sit_down_button"
+        android:text="@string/button_3_text"
+        app:layout_constraintBottom_toTopOf="@+id/button_5"
         app:layout_constraintStart_toStartOf="parent" />
 
     <Button
-        android:id="@+id/walking_button"
+        android:id="@+id/button_1"
         android:layout_width="174dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="16dp"
         android:layout_marginBottom="8dp"
         android:onClick="action_label_button"
-        android:text="Walking"
-        app:layout_constraintBottom_toTopOf="@+id/stair_up_button"
+        android:text="@string/button_1_text"
+        app:layout_constraintBottom_toTopOf="@+id/button_3"
         app:layout_constraintStart_toStartOf="parent" />
 
     <Button
-        android:id="@+id/stop_button"
+        android:id="@+id/button_2"
         android:layout_width="174dp"
         android:layout_height="wrap_content"
         android:layout_marginEnd="16dp"
         android:layout_marginBottom="8dp"
         android:onClick="action_label_button"
-        android:text="Stop"
-        app:layout_constraintBottom_toTopOf="@+id/stair_down_button"
+        android:text="@string/button_2_text"
+        app:layout_constraintBottom_toTopOf="@+id/button_4"
         app:layout_constraintEnd_toEndOf="parent" />
 
 
@@ -105,7 +105,7 @@
         android:layout_marginStart="144dp"
         android:layout_marginBottom="16dp"
         android:onClick="record_button"
-        android:text="Start Record"
+        android:text="@string/button_start_record"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
 
@@ -115,7 +115,7 @@
         android:layout_height="0dp"
         android:layout_marginBottom="16dp"
         android:padding="0dp"
-        app:layout_constraintBottom_toTopOf="@+id/walking_button"
+        app:layout_constraintBottom_toTopOf="@+id/button_1"
         app:layout_constraintTop_toBottomOf="@+id/FrameLayout_ProgressBar"
         tools:layout_editor_absoluteX="0dp">
 

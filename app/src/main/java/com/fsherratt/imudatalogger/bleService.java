@@ -55,6 +55,7 @@ public class bleService extends Service {
     public final static String EXTRA_ADDRESS_LIST = "com.example.fsherratt.imudatalogger.EXTRA_ADDRESS_LIST";
     public final static String EXTRA_UUID = "com.fsherratt.imudatalogger.EXTRA_UUID";
     public final static String EXTRA_DATA = "com.fsherratt.imudatalogger.EXTRA_DATA";
+    public final static String EXTRA_TIMESTAMP = "com.fsherratt.imudatalogger.EXTRA_TIMESTAMP";
     public final static String EXTRA_STATE = "com.fsherratt.imudatalogger.EXTRA_STATE";
     public final static String EXTRA_RSSI = "com.fsherratt.imudatalogger.EXTRA_RSSI";
     public final static String EXTRA_BATTERY = "com.fsherratt.imudatalogger.EXTRA_RSSI";
@@ -656,11 +657,12 @@ public class bleService extends Service {
             mContext.sendBroadcast(intent);
         }
 
-        private void setNewData( byte data[], String uuid ) {
+        private void setNewData( byte[] data, String uuid ) {
             final Intent intent = new Intent(bleService.ACTION_DATA_AVAILABLE);
             intent.putExtra(MainActivity.EXTRA_ADDRESS, mBluetoothDevice.getAddress());
             intent.putExtra(bleService.EXTRA_UUID, uuid);
             intent.putExtra(bleService.EXTRA_DATA, data);
+            intent.putExtra(bleService.EXTRA_TIMESTAMP, logService.makeTimestamp());
 
             mContext.sendBroadcast(intent);
         }

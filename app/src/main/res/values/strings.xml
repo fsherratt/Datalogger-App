@@ -4,4 +4,36 @@
     <string name="record_stop">Stop recording</string>
     <string name="preference_file_key">com.example.fsherratt.imudatalogger.PREFERENCE_FILE_KEY</string>
     <string name="friendly_name_prefix">com.example.fsherratt.imudatalogger.FRIENDLY_NAME.</string>
+
+
+    <string name="button_1_text">Walking</string>
+    <string name="button_1_shorthand">walking</string>
+
+    <string name="button_2_text">Open Door</string>
+    <string name="button_2_shorthand">open_door</string>
+
+    <string name="button_3_text">Ramp Up</string>
+    <string name="button_3_shorthand">ramp_up</string>
+
+    <string name="button_4_text">Ramp Down</string>
+    <string name="button_4_shorthand">ramp_down</string>
+
+    <string name="button_5_text">Stair Up</string>
+    <string name="button_5_shorthand">stair_up</string>
+
+    <string name="button_6_text">Stair Down</string>
+    <string name="button_6_shorthand">stair_down</string>
+
+    <string name="button_7_text">Stop</string>
+    <string name="button_7_shorthand">stop</string>
+
+    <string name="button_8_text">Abrupt Stop</string>
+    <string name="button_8_shorthand">abrupt_stop</string>
+
+    <string name="button_unknown_shorthand">unknown</string>
+
+    <string name="button_start_record">Start Record</string>
+    <string name="button_stop_record">Stop Record</string>
+
+    <string name="default_friendly_name">New Friendly Name</string>
 </resources>

@@ -28,6 +28,7 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.android.material.snackbar.BaseTransientBottomBar;
 import com.google.android.material.snackbar.Snackbar;
 
 import java.util.ArrayList;
@@ -84,9 +85,9 @@ public class MainActivity extends AppCompatActivity {
         mRssiRunable = new Runnable() {
             @Override
             public void run() {
-                Intent intent = new Intent(bleService.ACTION_REQUEST_RSSI);
-                intent.putStringArrayListExtra(bleService.EXTRA_ADDRESS_LIST, new ArrayList<>(mDevices.keySet()));
-                sendBroadcast(intent);
+                ArrayList<String> devices = new ArrayList<>(mDevices.keySet());
+                mBleServices.requestRssi(devices);
+//                mBleServices.requestBatteryLevel(devices);
 
                 mHandler.postDelayed(this, 5000);
             }
@@ -175,32 +176,32 @@ public class MainActivity extends AppCompatActivity {
         String action;
 
         switch (id) {
-            case R.id.walking_button:
-                action = "walking";
+            case R.id.button_1:
+                action = getString(R.string.button_1_shorthand);
                 break;
-            case R.id.stop_button:
-                action = "stop";
+            case R.id.button_2:
+                action = getString(R.string.button_2_shorthand);
                 break;
-            case R.id.stair_up_button:
-                action = "stair_up";
+            case R.id.button_3:
+                action = getString(R.string.button_3_shorthand);
                 break;
-            case R.id.stair_down_button:
-                action = "stair_down";
+            case R.id.button_4:
+                action = getString(R.string.button_4_shorthand);
                 break;
-            case R.id.sit_down_button:
-                action = "sit_down";
+            case R.id.button_5:
+                action = getString(R.string.button_5_shorthand);
                 break;
-            case R.id.stand_up_button:
-                action = "stand_up";
+            case R.id.button_6:
+                action = getString(R.string.button_6_shorthand);
                 break;
-            case R.id.open_door_button:
-                action = "open_door";
+            case R.id.button_7:
+                action = getString(R.string.button_7_shorthand);
                 break;
-            case R.id.jump_button:
-                action = "jump";
+            case R.id.button_8:
+                action = getString(R.string.button_8_shorthand);
                 break;
             default:
-                action = "unknown";
+                action = getString(R.string.button_unknown_shorthand);
         }
 
         mLogService.keyframe(action);
@@ -293,9 +294,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private final BroadcastReceiver mGattUpdateReceiver;
-
-    {
+    private final BroadcastReceiver mGattUpdateReceiver; {
         mGattUpdateReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
@@ -324,6 +323,7 @@ public class MainActivity extends AppCompatActivity {
                         int batLvl = intent.getIntExtra(bleService.EXTRA_BATTERY, 0);
 
                         device.setBatt(batLvl);
+                        Log.d(TAG, "mGattUpdateReceiver: Action_Battery_Level: " + batLvl);
                         break;
 
                     case logService.ACTION_DEVICE_FREQ:
@@ -332,7 +332,7 @@ public class MainActivity extends AppCompatActivity {
 
                         if (err == logService.FREQ_ERROR_NO_UPDATE) {
                             View contextView = findViewById(R.id.main_linearLayout);
-                            Snackbar.make(contextView, "Device: " + address + " error", Snackbar.LENGTH_INDEFINITE).show();
+                            Snackbar.make(contextView, "Device: " + address + " error", Snackbar.LENGTH_LONG).show();
                         }
 
                         device.setFreq(freq);
@@ -490,16 +490,15 @@ public class MainActivity extends AppCompatActivity {
         if (device.friendlyName != null)
             edittext.setText(device.friendlyName);
         else
-            edittext.setText("New Friendly Name");
+            edittext.setText(getString(R.string.default_friendly_name));
 
         alert.setMessage("For device " + device.name);
         alert.setTitle("Set Friendly Name");
 
+        //noinspection deprecation
         alert.setView(edittext, 50, 0, 50, 0);
 
-        alert.setPositiveButton("OK", (dialog, whichButton) -> {
-            saveFriendlyName(address, edittext.getText().toString());
-        });
+        alert.setPositiveButton("OK", (dialog, whichButton) -> saveFriendlyName(address, edittext.getText().toString()));
 
         alert.setNegativeButton("Reset", (dialog, whichButton) -> clearFriendlyName(address) );
 
@@ -664,6 +663,18 @@ public class MainActivity extends AppCompatActivity {
 
             mContext.sendBroadcast(intent);
         }
+
+        void requestRssi(ArrayList<String> bleDevices) {
+            Intent intent = new Intent(bleService.ACTION_REQUEST_RSSI);
+            intent.putStringArrayListExtra(bleService.EXTRA_ADDRESS_LIST, bleDevices);
+            sendBroadcast(intent);
+        }
+
+        void requestBatteryLevel(ArrayList<String> bleDevices) {
+            Intent intent = new Intent(bleService.ACTION_REQUEST_BATTERY_LEVEL);
+            intent.putStringArrayListExtra(bleService.EXTRA_ADDRESS_LIST, bleDevices);
+            sendBroadcast(intent);
+        }
     }
 
     class logServiceHolder {
@@ -722,6 +733,7 @@ public class MainActivity extends AppCompatActivity {
             if (!mDeviceLocation.containsKey(address))
                 return;
 
+            //noinspection ConstantConditions
             notifyItemChanged(mDeviceLocation.get(address));
         }
 
@@ -833,12 +845,14 @@ public class MainActivity extends AppCompatActivity {
         }
 
         startActionMode();
-        actionMode.setSubtitle(String.valueOf(selectedItems) + " Items Selected");
+        actionMode.setSubtitle(selectedItems + " Items Selected");
     }
 
     private void startActionMode() {
         if ( actionMode == null ) {
             actionMode = startActionMode(actionModeCallback);
+
+            assert actionMode != null;
             actionMode.setTitle("Connect/Disconnect");
         }
     }

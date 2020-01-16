@@ -84,13 +84,17 @@ public class logService extends Service {
             public void onReceive(Context context, Intent intent) {
                 final String action = intent.getAction();
 
+                if (action == null)
+                    return;
+
                 switch (action) {
                     case bleService.ACTION_DATA_AVAILABLE: {
                         String Address = intent.getStringExtra(MainActivity.EXTRA_ADDRESS);
                         String Uuid = intent.getStringExtra(bleService.EXTRA_UUID);
-                        byte data[] = intent.getByteArrayExtra(bleService.EXTRA_DATA);
+                        String time = intent.getStringExtra(bleService.EXTRA_TIMESTAMP);
+                        byte[] data = intent.getByteArrayExtra(bleService.EXTRA_DATA);
 
-                        writeToFile(buildOutputString(Address, Uuid, data, makeTimestamp()));
+                        writeToFile(buildOutputString(Address, Uuid, data, time));
                         newSample(Address);
                         break;
                     }
@@ -250,7 +254,7 @@ public class logService extends Service {
             fLabel.flush();
             fLabel.close();
         } catch (IOException e) {
-            Log.e(TAG, "closeFile: Error: " + String.valueOf(e));
+            Log.e(TAG, "closeFile: Error: " + e);
         }
 
         fOut = null;
@@ -276,7 +280,7 @@ public class logService extends Service {
                 return null;
             }
         } catch (IOException e) {
-            Log.e(TAG, "openFile: Error: " + String.valueOf(e));
+            Log.e(TAG, "openFile: Error: " + e);
             return null;
         }
 
@@ -284,7 +288,7 @@ public class logService extends Service {
             try {
                 returnFOut = new FileOutputStream(file);
             } catch (FileNotFoundException e) {
-                Log.e(TAG, "openFile: FileNotFound " + String.valueOf(e));
+                Log.e(TAG, "openFile: FileNotFound " + e);
                 return null;
             }
         } else {
@@ -301,7 +305,7 @@ public class logService extends Service {
         return String.valueOf(tsLong);
     }
 
-    private String buildOutputString( String address, String uuid, byte data[], String timestamp ) {
+    private String buildOutputString( String address, String uuid, byte[] data, String timestamp ) {
         String outputString;
 
         String dataString = bytesToHex(data);
