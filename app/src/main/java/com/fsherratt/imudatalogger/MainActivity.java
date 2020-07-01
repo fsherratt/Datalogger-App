@@ -179,15 +179,15 @@ public class MainActivity extends AppCompatActivity {
             case R.id.button_1:
                 action = getString(R.string.button_1_shorthand);
                 break;
-            case R.id.button_2:
-                action = getString(R.string.button_2_shorthand);
-                break;
-            case R.id.button_3:
-                action = getString(R.string.button_3_shorthand);
-                break;
-            case R.id.button_4:
-                action = getString(R.string.button_4_shorthand);
-                break;
+//            case R.id.button_2:
+//                action = getString(R.string.button_2_shorthand);
+//                break;
+//            case R.id.button_3:
+//                action = getString(R.string.button_3_shorthand);
+//                break;
+//            case R.id.button_4:
+//                action = getString(R.string.button_4_shorthand);
+//                break;
             case R.id.button_5:
                 action = getString(R.string.button_5_shorthand);
                 break;
@@ -197,9 +197,9 @@ public class MainActivity extends AppCompatActivity {
             case R.id.button_7:
                 action = getString(R.string.button_7_shorthand);
                 break;
-            case R.id.button_8:
-                action = getString(R.string.button_8_shorthand);
-                break;
+//            case R.id.button_8:
+//                action = getString(R.string.button_8_shorthand);
+//                break;
             default:
                 action = getString(R.string.button_unknown_shorthand);
         }
