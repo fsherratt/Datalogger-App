@@ -28,7 +28,6 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.google.android.material.snackbar.BaseTransientBottomBar;
 import com.google.android.material.snackbar.Snackbar;
 
 import java.util.ArrayList;
@@ -744,6 +743,28 @@ public class MainActivity extends AppCompatActivity {
             return new ViewHolder(view);
         }
 
+        private String connectionStateToName(int state) {
+            switch (state)
+            {
+                case bleService.DEVICE_STATE_ERROR:
+                    return "Error: During Connection";
+                case bleService.DEVICE_STATE_DISCONNECTED:
+                    return "Not Connected";
+                case bleService.DEVICE_STATE_INITIALISING:
+                    return "Initialising";
+                case bleService.DEVICE_STATE_CONNECTING:
+                    return "Connecting";
+                case bleService.DEVICE_STATE_DISCOVERING:
+                    return "Discovering Services";
+                case bleService.DEVICE_STATE_CONNECTED:
+                    return "Connected";
+                case bleService.DEVICE_STATE_STREAMING:
+                    return "Recording";
+                default:
+                    return "Error: Unknown State";
+            }
+        }
+
         @Override
         public void onBindViewHolder(@NonNull ViewHolder viewHolder, int position) {
             BleDevices device = mDevices.get(position);
@@ -752,14 +773,13 @@ public class MainActivity extends AppCompatActivity {
             String rssi = String.valueOf(device.rssi);
             String freq = String.valueOf(device.freq);
 
-            viewHolder.deviceAddress.setText(device.address);
+            viewHolder.deviceAddress.setText(connectionStateToName(device.connectionStatus));
 
             if (device.friendlyName == null)
                 viewHolder.deviceName.setText(device.name);
             else
                 viewHolder.deviceName.setText(device.friendlyName);
 
-            viewHolder.deviceStatus.setText(String.valueOf(device.connectionStatus));
             viewHolder.deviceRssi.setText(rssi);
             viewHolder.deviceFreq.setText(freq);
 
@@ -781,7 +801,6 @@ public class MainActivity extends AppCompatActivity {
 
             TextView deviceName;
             TextView deviceAddress;
-            TextView deviceStatus;
             TextView deviceRssi;
             TextView deviceFreq;
 
@@ -794,8 +813,7 @@ public class MainActivity extends AppCompatActivity {
                 super(itemView);
 
                 deviceName = itemView.findViewById(R.id.ble_device_name);
-                deviceAddress = itemView.findViewById(R.id.ble_device_uuid);
-                deviceStatus = itemView.findViewById(R.id.status_id);
+                deviceAddress = itemView.findViewById(R.id.connection_state_id);
                 deviceRssi = itemView.findViewById(R.id.rssi_text_view);
                 deviceFreq = itemView.findViewById(R.id.battery_text_view);
 
