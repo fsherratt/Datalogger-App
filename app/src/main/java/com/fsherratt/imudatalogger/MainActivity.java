@@ -1,11 +1,14 @@
 package com.fsherratt.imudatalogger;
 
+import android.Manifest;
+import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothDevice;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.os.Handler;
 
 import androidx.annotation.NonNull;
@@ -35,6 +38,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 
+import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -358,6 +362,14 @@ public class MainActivity extends AppCompatActivity {
         if (mScanning)
             return;
 
+        if (PackageManager.PERMISSION_DENIED == ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_COARSE_LOCATION))
+        {
+            Log.d(TAG, "startScanner: Permission denied");
+            ActivityCompat.requestPermissions(MainActivity.this,
+                    new String[] {Manifest.permission.ACCESS_COARSE_LOCATION},
+                    100);
+        }
+
         BluetoothLeScannerCompat scanner = BluetoothLeScannerCompat.getScanner();
         ScanSettings settings = new ScanSettings.Builder()
                 .setLegacy(false)
@@ -443,13 +455,34 @@ public class MainActivity extends AppCompatActivity {
     // Recording
     boolean recording = false;
 
-    public void startRecording() {
-        if (mBleServices == null) {
-            Toast.makeText(this, "No devices connected", Toast.LENGTH_SHORT).show();
-            return;
+    private boolean AnyDeviceConnected() {
+        for ( BleDevices device : mDevices.values()) {
+            if (device.connectionStatus >= bleService.DEVICE_STATE_CONNECTED) {
+                return true;
+            }
         }
+        return false;
+    }
+
+    public boolean startRecording() {
+        if (!AnyDeviceConnected()) {
+            Toast.makeText(this, "No devices connected", Toast.LENGTH_SHORT).show();
+            return false;
+        }
+
+        if (PackageManager.PERMISSION_DENIED == ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.WRITE_EXTERNAL_STORAGE))
+        {
+            Log.d(TAG, "startRecording: Permission denied");
+            ActivityCompat.requestPermissions(MainActivity.this,
+                    new String[] {Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                    100);
+            return false;
+        }
+
         mLogService.startRecording();
         mBleServices.startRecording(new ArrayList<>(mDevices.keySet()));
+
+        return true;
     }
 
     public void stopRecording() {
@@ -468,14 +501,16 @@ public class MainActivity extends AppCompatActivity {
             stopRecording();
             mRecord.setText(getString(R.string.record_start));
         } else {
-            recording = true;
-            startRecording();
-            mRecord.setText(getString(R.string.record_stop));
+            if (startRecording() ) {
+                recording = true;
+                mRecord.setText(getString(R.string.record_stop));
+            }
         }
     }
 
 
     // Friendly names
+    @SuppressLint("RestrictedApi")
     public void editFriendlyName(String address) {
         BleDevices device = mDevices.get(address);
         if (device == null)
@@ -495,7 +530,7 @@ public class MainActivity extends AppCompatActivity {
         alert.setTitle("Set Friendly Name");
 
         //noinspection deprecation
-        alert.setView(edittext, 50, 0, 50, 0);
+        final AlertDialog.Builder builder = alert.setView(edittext, 50, 0, 50, 0);
 
         alert.setPositiveButton("OK", (dialog, whichButton) -> saveFriendlyName(address, edittext.getText().toString()));
 
