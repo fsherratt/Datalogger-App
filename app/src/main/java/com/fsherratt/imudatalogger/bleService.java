@@ -62,6 +62,7 @@ public class bleService extends Service {
     public final static String EXTRA_ACTION = "com.fsherratt.imudatalogger.EXTRA_ACTION";
     public final static String EXTRA_RESULT = "com.fsherratt.imudatalogger.EXTRA_RESULT";
 
+    public final static int DEVICE_STATE_TIMEOUT = -2;
     public final static int DEVICE_STATE_ERROR = -1;
     public final static int DEVICE_STATE_DISCONNECTED = 0;
     public final static int DEVICE_STATE_INITIALISING = 1;
@@ -449,7 +450,7 @@ public class bleService extends Service {
         };
     }
 
-    class BluetoothAction {
+    static class BluetoothAction {
         String mAction;
         String mdevice;
         String mExpectedOutcome;
@@ -514,7 +515,7 @@ public class bleService extends Service {
 
 
     // Bluetooth GATT Connection class
-    class bleGattDevice {
+    static class bleGattDevice {
         private String TAG;
 
         final UUID streamServiceUUID = UUID.fromString("8f68223d-01df-3097-2e45-01a046aada78");

@@ -2,6 +2,7 @@ package com.fsherratt.imudatalogger;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -9,12 +10,15 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.drawable.Drawable;
+import android.location.LocationManager;
 import android.os.Handler;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.util.Log;
 import android.view.ActionMode;
 import android.view.ContextMenu;
@@ -29,7 +33,6 @@ import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import com.google.android.material.snackbar.Snackbar;
 
@@ -74,6 +77,7 @@ public class MainActivity extends AppCompatActivity {
         startReceiver();
 
         mRecord = findViewById(R.id.ble_record_button);
+
         mProgressBar = findViewById(R.id.ble_refresh_progress_bar);
 
         mProgressBar.setIndeterminate(false);
@@ -127,8 +131,6 @@ public class MainActivity extends AppCompatActivity {
         getMenuInflater().inflate(R.menu.main_menu, menu);
         mMenu = menu;
 
-        mMenu.getItem(0).setIconTintList(ContextCompat.getColorStateList(this, R.color.colorWhite));
-
         toggleScanner();
         return true;
     }
@@ -158,7 +160,7 @@ public class MainActivity extends AppCompatActivity {
 
     // UI Elements
     public void record_button(View view) {
-        toggleRecording();
+        toggleRecording(view);
     }
 
     public void item_select_button(String address) {
@@ -174,7 +176,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void action_label_button(View view) {
+        if (!recording) {
+            return;
+        }
+
         int id = view.getId();
+
+        setButtonHighlight(id);
 
         String action;
 
@@ -182,15 +190,12 @@ public class MainActivity extends AppCompatActivity {
             case R.id.button_1:
                 action = getString(R.string.button_1_shorthand);
                 break;
-//            case R.id.button_2:
-//                action = getString(R.string.button_2_shorthand);
-//                break;
-//            case R.id.button_3:
-//                action = getString(R.string.button_3_shorthand);
-//                break;
-//            case R.id.button_4:
-//                action = getString(R.string.button_4_shorthand);
-//                break;
+            case R.id.button_3:
+                action = getString(R.string.button_3_shorthand);
+                break;
+            case R.id.button_4:
+                action = getString(R.string.button_4_shorthand);
+                break;
             case R.id.button_5:
                 action = getString(R.string.button_5_shorthand);
                 break;
@@ -200,14 +205,38 @@ public class MainActivity extends AppCompatActivity {
             case R.id.button_7:
                 action = getString(R.string.button_7_shorthand);
                 break;
-//            case R.id.button_8:
-//                action = getString(R.string.button_8_shorthand);
-//                break;
             default:
                 action = getString(R.string.button_unknown_shorthand);
         }
 
         mLogService.keyframe(action);
+    }
+
+    private Button lastClicked = null;
+    private Drawable lastClickedDrawable = null;
+
+    private void clearButtonHighlight() {
+        if (lastClicked != null) {
+            lastClicked.setBackgroundDrawable(lastClickedDrawable);//getDrawable(android.R.drawable.btn_default));
+            lastClicked.setTextColor(getColor(R.color.colorBlack));
+
+            lastClickedDrawable = null;
+            lastClicked = null;
+        }
+    }
+
+    private void setButtonHighlight(int id) {
+        clearButtonHighlight();
+
+        Button clickedButton = findViewById(id);
+
+        lastClickedDrawable = clickedButton.getBackground();
+        lastClicked = clickedButton;
+
+        clickedButton.setBackgroundColor(getColor(R.color.colorAccent));
+        clickedButton.setTextColor(getColor(R.color.colorWhite));
+
+
     }
 
 
@@ -279,6 +308,7 @@ public class MainActivity extends AppCompatActivity {
         intentFilter.addAction(bleService.ACTION_DEVICE_RSSI);
         intentFilter.addAction(bleService.ACTION_BATTERY_LEVEL);
         intentFilter.addAction(logService.ACTION_DEVICE_FREQ);
+        intentFilter.addAction(logService.ACTION_SAVE_FILE_NAME);
 
         try {
             registerReceiver(mGattUpdateReceiver, intentFilter);
@@ -302,47 +332,71 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onReceive(Context context, Intent intent) {
                 final String action = intent.getAction();
-                final String address = intent.getStringExtra(EXTRA_ADDRESS);
 
-                BleDevices device = mDevices.get(address);
-
-                if (action == null || device == null)
+                if (action == null)
                     return;
 
-                switch (action) {
-                    case bleService.ACTION_GATT_STATE_CHANGED:
-                        final int state = intent.getIntExtra(bleService.EXTRA_STATE, -1);
-
-                        device.setConnectionStatus(state);
-                        break;
-
-                    case bleService.ACTION_DEVICE_RSSI:
-                        int rssi = intent.getIntExtra(bleService.EXTRA_RSSI, 0);
-
-                        device.setRssi(rssi);
-                        break;
-
-                    case bleService.ACTION_BATTERY_LEVEL:
-                        int batLvl = intent.getIntExtra(bleService.EXTRA_BATTERY, 0);
-
-                        device.setBatt(batLvl);
-                        Log.d(TAG, "mGattUpdateReceiver: Action_Battery_Level: " + batLvl);
-                        break;
-
-                    case logService.ACTION_DEVICE_FREQ:
-                        int freq = intent.getIntExtra(logService.EXTRA_FREQ, 0);
-                        int err = intent.getIntExtra(logService.EXTRA_ERROR, 0);
-
-                        if (err == logService.FREQ_ERROR_NO_UPDATE) {
-                            View contextView = findViewById(R.id.main_linearLayout);
-                            Snackbar.make(contextView, "Device: " + address + " error", Snackbar.LENGTH_LONG).show();
-                        }
-
-                        device.setFreq(freq);
-                        break;
+                if (action.equals(logService.ACTION_SAVE_FILE_NAME)) {
+                    updateFileName(intent.getStringExtra(logService.EXTRA_FILE_NAME));
+                } else {
+                    updateBluetoothDevice(action, intent);
                 }
             }
         };
+    }
+
+    private void updateBluetoothDevice(String action, Intent intent) {
+
+        final String address = intent.getStringExtra(EXTRA_ADDRESS);
+        BleDevices device = mDevices.get(address);
+
+        if (device == null)
+            return;
+
+        switch (action) {
+            case bleService.ACTION_GATT_STATE_CHANGED:
+                final int state = intent.getIntExtra(bleService.EXTRA_STATE, -1);
+
+                device.setConnectionStatus(state);
+                break;
+
+            case bleService.ACTION_DEVICE_RSSI:
+                int rssi = intent.getIntExtra(bleService.EXTRA_RSSI, 0);
+
+                device.setRssi(rssi);
+                break;
+
+            case bleService.ACTION_BATTERY_LEVEL:
+                int batLvl = intent.getIntExtra(bleService.EXTRA_BATTERY, 0);
+
+                device.setBatt(batLvl);
+                Log.d(TAG, "mGattUpdateReceiver: Action_Battery_Level: " + batLvl);
+                break;
+
+            case logService.ACTION_DEVICE_FREQ:
+                int freq = intent.getIntExtra(logService.EXTRA_FREQ, 0);
+                int err = intent.getIntExtra(logService.EXTRA_ERROR, 0);
+
+                if (err == logService.FREQ_ERROR_NO_UPDATE) {
+                    String name = mDevices.get(address).friendlyName;
+                    if (name == null) {
+                        name = mDevices.get(address).name;
+                    }
+
+                    View contextView = findViewById(android.R.id.content).getRootView();
+                    Snackbar snackbar = Snackbar.make(contextView, "Error with sensor " + name, Snackbar.LENGTH_INDEFINITE);
+                    snackbar.setAction("Close", new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            snackbar.dismiss();
+                        }
+                    });
+                    snackbar.show();
+                }
+
+                device.setFreq(freq);
+                break;
+        }
     }
 
 
@@ -362,12 +416,18 @@ public class MainActivity extends AppCompatActivity {
         if (mScanning)
             return;
 
-        if (PackageManager.PERMISSION_DENIED == ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_COARSE_LOCATION))
+        if (PackageManager.PERMISSION_DENIED == ContextCompat.checkSelfPermission(
+                MainActivity.this,
+                Manifest.permission.ACCESS_COARSE_LOCATION))
         {
             Log.d(TAG, "startScanner: Permission denied");
             ActivityCompat.requestPermissions(MainActivity.this,
                     new String[] {Manifest.permission.ACCESS_COARSE_LOCATION},
                     100);
+        }
+
+        if (!checkBluetooth() || !checkLocation()) {
+            return;
         }
 
         BluetoothLeScannerCompat scanner = BluetoothLeScannerCompat.getScanner();
@@ -386,7 +446,6 @@ public class MainActivity extends AppCompatActivity {
 
         if (mMenu != null) {
             mMenu.getItem(1).setIcon(ContextCompat.getDrawable(this, R.drawable.ic_cancel_black_24dp));
-            mMenu.getItem(1).setIconTintList(ContextCompat.getColorStateList(this, R.color.colorWhite));
         }
 
         mProgressBar.setIndeterminate(true);
@@ -406,13 +465,55 @@ public class MainActivity extends AppCompatActivity {
 
         if (mMenu != null) {
             mMenu.getItem(1).setIcon(ContextCompat.getDrawable(this, R.drawable.ic_refresh_black_24dp));
-            mMenu.getItem(1).setIconTintList(ContextCompat.getColorStateList(this, R.color.colorWhite));
         }
 
         mProgressBar.setIndeterminate(false);
 
         mHandler.removeCallbacks(mScanTimeout);
+
+        if (mDevices.size() == 0) {
+            Log.d(TAG, "No Devices Found");
+        }
     }
+
+    public boolean checkBluetooth() {
+        int REQUEST_ENABLE_BLUETOOTH = 0;
+
+        BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+        if (bluetoothAdapter == null) {
+            return false;
+        }
+        if (!bluetoothAdapter.isEnabled()) {
+            Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+            startActivityForResult(enableBtIntent, REQUEST_ENABLE_BLUETOOTH);
+            return false;
+        }
+
+        return true;
+    }
+
+    public boolean checkLocation() {
+        LocationManager locationManger = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
+        if (!locationManger.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+            Log.d(TAG, "Location Disabled");
+            final AlertDialog.Builder builder = new AlertDialog.Builder(this);
+
+            builder.setMessage("Location Services are required to discover devices")
+                    .setCancelable(false)
+                    .setPositiveButton("Enable", (dialog, id) -> {
+                        Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+                        startActivity(intent);
+                    })
+                    .setNegativeButton("Ignore", (dialog, id) -> dialog.cancel());
+            final AlertDialog alert = builder.create();
+            alert.show();
+
+            return false;
+        }
+
+        return true;
+    }
+
 
     private ScanCallback mScanCallback = new ScanCallback() {
         @Override
@@ -454,6 +555,7 @@ public class MainActivity extends AppCompatActivity {
 
     // Recording
     boolean recording = false;
+    String mRecordingFileName = "Unknown";
 
     private boolean AnyDeviceConnected() {
         for ( BleDevices device : mDevices.values()) {
@@ -464,13 +566,21 @@ public class MainActivity extends AppCompatActivity {
         return false;
     }
 
-    public boolean startRecording() {
+    public boolean startRecording(View view) {
         if (!AnyDeviceConnected()) {
-            Toast.makeText(this, "No devices connected", Toast.LENGTH_SHORT).show();
+            Snackbar snackbar = Snackbar.make(view, "No devices connected", Snackbar.LENGTH_SHORT);
+            snackbar.setAction("Close", new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    snackbar.dismiss();
+                }
+            });
+            snackbar.show();
             return false;
         }
 
-        if (PackageManager.PERMISSION_DENIED == ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.WRITE_EXTERNAL_STORAGE))
+        if (PackageManager.PERMISSION_DENIED == ContextCompat.checkSelfPermission(MainActivity.this,
+                                                                                    Manifest.permission.WRITE_EXTERNAL_STORAGE))
         {
             Log.d(TAG, "startRecording: Permission denied");
             ActivityCompat.requestPermissions(MainActivity.this,
@@ -486,26 +596,33 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void stopRecording() {
-        if (mBleServices == null) {
-            Toast.makeText(this, "No devices connected", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
         mLogService.stopRecording();
         mBleServices.stopRecording(new ArrayList<>(mDevices.keySet()));
     }
 
-    public void toggleRecording() {
+    public void toggleRecording(View view) {
         if (recording) {
             recording = false;
-            stopRecording();
+            clearButtonHighlight();
             mRecord.setText(getString(R.string.record_start));
+
+            stopRecording();
+            launchSaveActivity();
         } else {
-            if (startRecording() ) {
+            if (startRecording(view) ) {
                 recording = true;
                 mRecord.setText(getString(R.string.record_stop));
             }
         }
+    }
+
+    public void updateFileName(String filename) {
+        mRecordingFileName = filename;
+    }
+    public void launchSaveActivity() {
+        Intent intent = new Intent(this, SaveActivity.class);
+        intent.putExtra(SaveActivity.EXTRA_FILENAME, mRecordingFileName);
+        startActivity(intent);
     }
 
 
@@ -530,7 +647,7 @@ public class MainActivity extends AppCompatActivity {
         alert.setTitle("Set Friendly Name");
 
         //noinspection deprecation
-        final AlertDialog.Builder builder = alert.setView(edittext, 50, 0, 50, 0);
+        alert.setView(edittext, 50, 0, 50, 0);
 
         alert.setPositiveButton("OK", (dialog, whichButton) -> saveFriendlyName(address, edittext.getText().toString()));
 
@@ -704,14 +821,14 @@ public class MainActivity extends AppCompatActivity {
             sendBroadcast(intent);
         }
 
-        void requestBatteryLevel(ArrayList<String> bleDevices) {
-            Intent intent = new Intent(bleService.ACTION_REQUEST_BATTERY_LEVEL);
-            intent.putStringArrayListExtra(bleService.EXTRA_ADDRESS_LIST, bleDevices);
-            sendBroadcast(intent);
-        }
+//        void requestBatteryLevel(ArrayList<String> bleDevices) {
+//            Intent intent = new Intent(bleService.ACTION_REQUEST_BATTERY_LEVEL);
+//            intent.putStringArrayListExtra(bleService.EXTRA_ADDRESS_LIST, bleDevices);
+//            sendBroadcast(intent);
+//        }
     }
 
-    class logServiceHolder {
+    static class logServiceHolder {
         private Context mContext;
 
         logServiceHolder(Context context) {

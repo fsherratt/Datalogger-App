@@ -1,5 +1,7 @@
 <resources>
-    <string name="app_name">IMU Datalogger</string>
+    <string name="log_directory">IMU_Logs</string>
+
+    <string name="app_name">Gait Datalogger</string>
     <string name="record_start">Start recording</string>
     <string name="record_stop">Stop recording</string>
     <string name="preference_file_key">com.example.fsherratt.imudatalogger.PREFERENCE_FILE_KEY</string>
@@ -36,4 +38,18 @@
     <string name="button_stop_record">Stop Record</string>
 
     <string name="default_friendly_name">New Friendly Name</string>
+    <string name="title_activity_save">Save Data</string>
+
+    <string name="Save_description">Please describe the data you have just collected, then press upload to share with us!
+        Data is shared anonymously.</string>
+
+    <string name="Description_hint">Describe the recording. What enviroment were you in? What kind of obstacles did you encounter?</string>
+
+    <string-array name="gender_options">
+        <item>Please select</item>
+        <item>Male</item>
+        <item>Female</item>
+        <item>Non-Binary</item>
+        <item>Prefer not to say</item>
+    </string-array>
 </resources>

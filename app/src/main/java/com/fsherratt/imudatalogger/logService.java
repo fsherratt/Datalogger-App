@@ -26,11 +26,13 @@ public class logService extends Service {
     public final static String ACTION_RECORD_START = "com.fsherratt.imudatalogger.ACTION_RECORD_START";
     public final static String ACTION_RECORD_STOP = "com.fsherratt.imudatalogger.ACTION_RECORD_STOP";
     public final static String ACTION_DEVICE_FREQ = "com.fsherratt.imudatalogger.ACTION_DEVICE_FREQ";
+    public final static String ACTION_SAVE_FILE_NAME = "com.fsherratt.imudatalogger.ACTION_SAVE_FILE_NAME";
 
     public final static String EXTRA_LABEL = "com.fsherratt.imudatalogger.EXTRA_LABEL";
     public final static String EXTRA_TIMESTAMP = "com.fsherratt.imudatalogger.EXTRA_TIMESTAMP";
     public final static String EXTRA_FREQ = "com.fsherratt.imudatalogger.EXTRA_FREQ";
     public final static String EXTRA_ERROR = "com.fsherratt.imudatalogger.EXTRA_ERROR";
+    public final static String EXTRA_FILE_NAME = "com.fsherratt.imudatalogger.EXTRA_FILE_NAME";
 
     public final static int FREQ_ERROR_NONE = 0;
     public final static int FREQ_ERROR_NO_UPDATE = 1;
@@ -135,7 +137,7 @@ public class logService extends Service {
     // Data frequency
     ArrayMap<String, bleSampleCount> sampleCount = new ArrayMap<>();
 
-    class bleSampleCount {
+    static class bleSampleCount {
         String address;
         int currentCount;
         int lastHealthCount;
@@ -237,10 +239,14 @@ public class logService extends Service {
 
         mFileName = new SimpleDateFormat("'Log_'yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
 
-        fOut = openFileStream(mFileName + ".txt");
-        fLabel = openFileStream(mFileName + "_label.txt");
+        fOut = openFileStream(this,mFileName + ".txt");
+        fLabel = openFileStream(this,mFileName + "_label.txt");
 
         recordEnable = true;
+
+        Intent intent = new Intent(ACTION_SAVE_FILE_NAME);
+        intent.putExtra(EXTRA_FILE_NAME, mFileName);
+        sendBroadcast(intent);
     }
 
     void closeFile() {
@@ -262,8 +268,10 @@ public class logService extends Service {
         recordEnable = false;
     }
 
-    FileOutputStream openFileStream(String filename) {
-        File dir = new File(Environment.getExternalStorageDirectory() + File.separator + "IMU_Logs");
+
+    static public FileOutputStream openFileStream(Context context, String filename) {
+        String logDir = context.getResources().getString(R.string.log_directory);
+        File dir = new File(Environment.getExternalStorageDirectory() + File.separator + logDir);
 
         if ( !dir.exists() ) {
             if ( !dir.mkdir() ) {
@@ -298,7 +306,6 @@ public class logService extends Service {
 
         return returnFOut;
     }
-
 
     public static String makeTimestamp() {
         long tsLong = System.currentTimeMillis();
