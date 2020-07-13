@@ -2,132 +2,208 @@
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/main_linearLayout"
+    android:id="@+id/main_constrainedLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:layout_margin="0dp"
-    android:orientation="vertical"
-    android:padding="0dp">
+    android:fitsSystemWindows="true"
+    android:orientation="vertical">
 
-    <Button
-        android:id="@+id/button_7"
-        android:layout_width="174dp"
-        android:layout_height="80dp"
-        android:layout_marginEnd="18dp"
-        android:onClick="action_label_button"
-        android:text="@string/button_7_text"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="@+id/button_1" />
-
-    <Button
-        android:id="@+id/button_6"
-        android:layout_width="174dp"
-        android:layout_height="80dp"
-        android:layout_marginEnd="16dp"
-        android:onClick="action_label_button"
-        android:text="@string/button_6_text"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="@+id/button_5" />
-
-    <Button
-        android:id="@+id/button_5"
-        android:layout_width="174dp"
-        android:layout_height="80dp"
-        android:layout_marginStart="18dp"
-        android:layout_marginBottom="18dp"
-        android:onClick="action_label_button"
-        android:text="@string/button_5_text"
-        app:layout_constraintBottom_toTopOf="@+id/button_3"
-        app:layout_constraintStart_toStartOf="parent" />
-
-
-    <Button
-        android:id="@+id/button_3"
-        android:layout_width="174dp"
-        android:layout_height="80dp"
-        android:layout_marginStart="18dp"
-        android:layout_marginBottom="24dp"
-        android:onClick="action_label_button"
-        android:text="@string/button_3_text"
-        app:layout_constraintBottom_toTopOf="@+id/ble_record_button"
-        app:layout_constraintStart_toStartOf="parent" />
-
-    <Button
-        android:id="@+id/button_4"
-        android:layout_width="174dp"
-        android:layout_height="80dp"
-        android:layout_marginEnd="18dp"
-        android:onClick="action_label_button"
-        android:text="@string/button_4_text"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="@+id/button_3" />
-
-    <Button
-        android:id="@+id/button_1"
-        android:layout_width="174dp"
-        android:layout_height="80dp"
-        android:layout_marginStart="18dp"
-        android:layout_marginBottom="18dp"
-        android:onClick="action_label_button"
-        android:text="@string/button_1_text"
-        app:layout_constraintBottom_toTopOf="@+id/button_5"
-        app:layout_constraintStart_toStartOf="parent" />
-
-    <Button
-        android:id="@+id/ble_record_button"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="144dp"
-        android:layout_marginBottom="24dp"
-        android:onClick="record_button"
-        android:text="@string/button_start_record"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
-
-    <androidx.core.widget.NestedScrollView
-        android:id="@+id/nestedScrollView2"
-        android:layout_width="match_parent"
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/Top_Section"
+        android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_marginBottom="16dp"
-        android:padding="0dp"
-        app:layout_constraintBottom_toTopOf="@+id/button_1"
-        app:layout_constraintTop_toBottomOf="@+id/FrameLayout_ProgressBar"
-        tools:layout_editor_absoluteX="0dp">
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/device_recycler_view"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
-    </androidx.core.widget.NestedScrollView>
-
-    <FrameLayout
-        android:id="@+id/FrameLayout_ProgressBar"
-        android:layout_width="match_parent"
-        android:layout_height="5dp"
-        android:layout_marginBottom="-2dp"
+        app:layout_constraintBottom_toTopOf="@id/Bottom_Section"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
-        <ProgressBar
-            android:id="@+id/ble_refresh_progress_bar"
-            style="@style/Widget.AppCompat.ProgressBar.Horizontal"
+        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+            android:id="@+id/devices_swipe_refresh"
             android:layout_width="match_parent"
-            android:layout_height="30dp"
-            android:layout_marginTop="-15dp"
-            android:indeterminate="true"
-            android:indeterminateTint="@color/colorAccent"
-            android:indeterminateTintMode="src_atop"
-            tools:layout_editor_absoluteX="0dp"
-            tools:layout_editor_absoluteY="0dp" />
-    </FrameLayout>
+            android:layout_height="0dp"
+            android:fillViewport="true"
+            android:padding="0dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
 
-    <View
-        android:id="@+id/divider"
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/device_recycler_view"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/Bottom_Section"
         android:layout_width="match_parent"
-        android:layout_height="2dp"
-        android:layout_marginHorizontal="10dp"
-        android:background="?android:attr/listDivider"
-        app:layout_constraintTop_toBottomOf="@+id/nestedScrollView2"
-        tools:layout_editor_absoluteX="16dp" />
+        android:layout_height="wrap_content"
+        android:background="@color/colorWhite"
+        android:elevation="20dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <View
+            android:id="@+id/divider"
+            android:layout_width="match_parent"
+            android:layout_height="3dp"
+            android:background="@color/colorPrimary"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TableRow
+            android:id="@+id/tableRow"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            app:layout_constraintBottom_toTopOf="@+id/ble_record_button"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/divider">
+
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:id="@+id/constraintLayout6"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_weight="1">
+
+                <Button
+                    android:id="@+id/button_1"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:background="#FFFFFF"
+                    android:backgroundTint="@color/colorLight"
+                    android:elevation="10dp"
+                    android:onClick="action_label_button"
+                    android:paddingTop="16dp"
+                    android:paddingBottom="16dp"
+                    android:text="@string/button_1_text"
+                    android:textColor="@color/colorBlack"
+                    app:cornerRadius="6dp"
+                    app:layout_constraintEnd_toEndOf="@+id/button_5"
+                    app:layout_constraintStart_toStartOf="@+id/button_5"
+                    app:layout_constraintTop_toTopOf="parent" />
+
+                <Button
+                    android:id="@+id/button_5"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:backgroundTint="@color/colorLight"
+                    android:onClick="action_label_button"
+                    android:paddingTop="16dp"
+                    android:paddingBottom="16dp"
+                    android:text="@string/button_5_text"
+                    android:textColor="@color/colorBlack"
+                    app:cornerRadius="6dp"
+                    app:layout_constraintEnd_toEndOf="@+id/button_3"
+                    app:layout_constraintStart_toStartOf="@+id/button_3"
+                    app:layout_constraintTop_toBottomOf="@+id/button_1" />
+
+                <Button
+                    android:id="@+id/button_3"
+
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="24dp"
+                    android:layout_marginTop="12dp"
+                    android:layout_marginEnd="16dp"
+                    android:layout_marginBottom="24dp"
+                    android:backgroundTint="@color/colorLight"
+                    android:onClick="action_label_button"
+                    android:paddingTop="16dp"
+                    android:paddingBottom="16dp"
+                    android:text="@string/button_3_text"
+                    android:textColor="@color/colorBlack"
+                    app:cornerRadius="6dp"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toBottomOf="@id/button_5" />
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:id="@+id/constraintLayout7"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_weight="1">
+
+                <Button
+                    android:id="@+id/button_7"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:backgroundTint="@color/colorLight"
+                    android:onClick="action_label_button"
+                    android:paddingTop="16dp"
+                    android:paddingBottom="16dp"
+                    android:text="@string/button_7_text"
+                    android:textColor="@color/colorBlack"
+                    app:cornerRadius="6dp"
+                    app:layout_constraintEnd_toEndOf="@+id/button_6"
+                    app:layout_constraintStart_toStartOf="@+id/button_6"
+                    app:layout_constraintTop_toTopOf="parent" />
+
+                <Button
+                    android:id="@+id/button_6"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:backgroundTint="@color/colorLight"
+                    android:onClick="action_label_button"
+                    android:paddingTop="16dp"
+                    android:paddingBottom="16dp"
+                    android:text="@string/button_6_text"
+                    android:textColor="@color/colorBlack"
+                    app:cornerRadius="6dp"
+                    app:layout_constraintEnd_toEndOf="@+id/button_4"
+                    app:layout_constraintStart_toStartOf="@+id/button_4"
+                    app:layout_constraintTop_toBottomOf="@+id/button_7" />
+
+                <Button
+                    android:id="@+id/button_4"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:layout_marginTop="12dp"
+                    android:layout_marginEnd="24dp"
+                    android:layout_marginBottom="24dp"
+                    android:backgroundTint="@color/colorLight"
+                    android:onClick="action_label_button"
+                    android:paddingTop="16dp"
+                    android:paddingBottom="16dp"
+                    android:text="@string/button_4_text"
+                    android:textColor="@color/colorBlack"
+                    app:cornerRadius="6dp"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toBottomOf="@+id/button_6" />
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+        </TableRow>
+
+        <Button
+            android:id="@+id/ble_record_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:backgroundTint="@color/colorLight"
+            tools:ignore="RtlHardcoded"
+            android:drawableLeft="@drawable/circle"
+            android:onClick="record_button"
+            android:paddingLeft="12dp"
+            android:paddingTop="8dp"
+            android:paddingRight="12dp"
+            android:paddingBottom="8dp"
+            android:text="@string/record_start"
+            android:textColor="@color/colorBlack"
+            app:cornerRadius="6dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent" />
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

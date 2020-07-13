@@ -30,7 +30,7 @@ public class PopUpClass  {
     public PopUpClass(Context context) {
         mContext = context;
 
-        LayoutInflater inflater = (LayoutInflater) mContext.getSystemService(mContext.LAYOUT_INFLATER_SERVICE);
+        LayoutInflater inflater = (LayoutInflater) mContext.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
         View popupView = inflater.inflate(R.layout.upload_popup, null);
 
         mProgress = (ProgressBar)popupView.findViewById(R.id.upload_progressBar);
@@ -69,7 +69,7 @@ public class PopUpClass  {
         // Dim behind
         View container = mPopupWindow.getContentView().getRootView();
 
-        WindowManager wm = (WindowManager)mContext.getSystemService(mContext.WINDOW_SERVICE);
+        WindowManager wm = (WindowManager)mContext.getSystemService(Context.WINDOW_SERVICE);
         WindowManager.LayoutParams p = (WindowManager.LayoutParams) container.getLayoutParams();
 
         p.flags |= WindowManager.LayoutParams.FLAG_DIM_BEHIND;
@@ -94,8 +94,20 @@ public class PopUpClass  {
         mFileName.setText(fileName);
     }
 
-    public void setButtonName(String name) {
-        mCancelButton.setText(name);
+    public void setButtonDone(Boolean state) {
+        if (state) {
+            mCancelButton.setText("Close");
+            mCancelButton.setBackgroundColor(mContext.getColor(R.color.colorAccent));
+            mCancelButton.setTextColor(mContext.getColor(R.color.colorWhite));
+        } else {
+            mCancelButton.setText("Cancel");
+            mCancelButton.setBackgroundColor(mContext.getColor(R.color.colorLight));
+            mCancelButton.setTextColor(mContext.getColor(R.color.colorBlack));
+        }
+    }
+
+    public void setButtonColor(int color) {
+
     }
 
     // Popup callbacks

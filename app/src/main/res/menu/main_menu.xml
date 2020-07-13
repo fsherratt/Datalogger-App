@@ -3,17 +3,16 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     tools:context="com.example.actiph_ble.MainActivity">
-    <item
-        android:id="@+id/ble_disconnect"
-        android:icon="@drawable/ic_bluetooth_disabled_black_24dp"
-        android:iconTint="@color/colorWhite"
-        android:title="ble_disconnect"
-        app:showAsAction="always" />
-    <item
+<!--    <item-->
+<!--        android:id="@+id/ble_disconnect"-->
+<!--        android:icon="@drawable/ic_bluetooth_disabled_black_24dp"-->
+<!--        android:iconTint="@color/colorWhite"-->
+<!--        android:title="ble_disconnect"-->
+<!--        app:showAsAction="always" />-->
+   <item
         android:id="@+id/refresh_ble"
         app:showAsAction="always"
         android:icon="@drawable/ic_refresh_black_24dp"
-        android:iconTint="@color/colorWhite"
         android:orderInCategory="100"
         android:title="Refresh BLE Devices" />
 </menu>

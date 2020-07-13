@@ -34,19 +34,18 @@
 
     <string name="button_unknown_shorthand">unknown</string>
 
-    <string name="button_start_record">Start Record</string>
-    <string name="button_stop_record">Stop Record</string>
+    <string name="Save_description">Please describe the data you have just collected, then press upload to share with us. The data log will be shared completely anonymously.</string>
 
-    <string name="default_friendly_name">New Friendly Name</string>
-    <string name="title_activity_save">Save Data</string>
-
-    <string name="Save_description">Please describe the data you have just collected, then press upload to share with us!
-        Data is shared anonymously.</string>
-
-    <string name="Description_hint">Describe the recording. What enviroment were you in? What kind of obstacles did you encounter?</string>
+    <string name="Description_hint">Please describe the recording. What environment were you in? What kind of obstacles did you encounter?</string>
+    <string name="meta_data_title">Meta Data</string>
+    <string name="height_label">Height (cm)</string>
+    <string name="upload_button_text">Upload</string>
+    <string name="close_button_text">Close</string>
+    <string name="gender_field_label">Gender</string>
+    <string name="description_field_label">Description</string>
+    <string name="title_for_save_page">Save the Data Log</string>
 
     <string-array name="gender_options">
-        <item>Please select</item>
         <item>Male</item>
         <item>Female</item>
         <item>Non-Binary</item>

@@ -19,8 +19,7 @@
             android:orientation="vertical"
             android:paddingLeft="20dp"
             android:paddingTop="20dp"
-            android:paddingRight="20dp"
-            android:paddingBottom="10dp">
+            android:paddingRight="20dp">
 
             <TextView
                 android:id="@+id/titleText"
@@ -28,8 +27,8 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
                 android:text="Uploading"
-                android:textSize="20sp"
-                android:textStyle="bold" />
+                android:textColor="@color/colorAccent"
+                android:textSize="24sp" />
 
             <TextView
                 android:id="@+id/Filename_textview"
@@ -38,7 +37,9 @@
                 android:layout_marginTop="6dp"
                 android:layout_marginBottom="6dp"
                 android:text="Done"
-                android:textAlignment="center" />
+                android:textAlignment="center"
+                android:textColor="@color/colorText"
+                android:textSize="14sp" />
 
             <ProgressBar
                 android:id="@+id/upload_progressBar"
@@ -51,11 +52,17 @@
 
             <Button
                 android:id="@+id/cancelButton"
-                android:layout_width="150dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_horizontal"
                 android:layout_marginTop="6dp"
-                android:text="Cancel" />
+                android:layout_marginBottom="20dp"
+                android:backgroundTint="@color/colorLight"
+                android:paddingLeft="24dp"
+                android:paddingRight="24dp"
+                android:text="Cancel"
+                android:textColor="@color/colorBlack"
+                app:cornerRadius="6dp" />
 
         </LinearLayout>
 

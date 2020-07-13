@@ -1,95 +1,339 @@
 <?xml version="1.0" encoding="utf-8"?>
 
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/parent_layout"
+    android:id="@+id/deviceCardView"
+    style="@style/CardView.Light"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:paddingLeft="8dp"
-    android:paddingTop="8dp"
-    android:paddingRight="8dp"
-    android:paddingBottom="6dp">
+    android:layout_marginLeft="8dp"
+    android:layout_marginTop="8dp"
+    android:layout_marginRight="8dp"
+    android:animateLayoutChanges="true"
+    android:animationCache="true"
+    app:cardCornerRadius="6dp">
 
-    <TextView
-        android:id="@+id/ble_device_name"
-        android:layout_width="260dp"
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_alignParentTop="true"
-        android:layout_marginStart="8dp"
-        android:layout_marginTop="0dp"
-        android:layout_toEndOf="@+id/add_device_button"
-        android:text="-"
-        android:textColor="@color/colorPrimaryDark"
-        android:textSize="24sp" />
+        android:animateLayoutChanges="true"
+        android:animationCache="true">
 
-    <TextView
-        android:id="@+id/connection_state_id"
-        android:layout_width="260dp"
-        android:layout_height="wrap_content"
-        android:layout_below="@+id/ble_device_name"
-        android:layout_alignStart="@+id/ble_device_name"
-        android:layout_marginStart="0dp"
-        android:layout_marginTop="0dp"
-        android:text="-"
-        android:textColor="@color/colorLight"
-        android:textSize="16sp" />
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/addition_details"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:animateLayoutChanges="true"
+            android:animationCache="true"
+            android:backgroundTint="@color/colorLight"
+            android:elevation="1dp"
+            android:visibility="visible"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent">
 
-    <TextView
-        android:id="@+id/rssi_text_view"
-        android:layout_width="41dp"
-        android:layout_height="wrap_content"
-        android:layout_alignTop="@+id/ble_device_name"
-        android:layout_marginTop="0dp"
-        android:layout_marginEnd="5dp"
-        android:layout_toStartOf="@+id/rssi_image_view"
-        android:text="-"
-        android:textAlignment="textEnd"
-        android:textColor="@color/colorLight" />
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:id="@+id/constraintLayout3"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent">
 
-    <TextView
-        android:id="@+id/battery_text_view"
-        android:layout_width="41dp"
-        android:layout_height="wrap_content"
-        android:layout_below="@+id/rssi_text_view"
-        android:layout_alignStart="@+id/rssi_text_view"
-        android:layout_alignEnd="@+id/rssi_text_view"
-        android:layout_marginStart="-2dp"
-        android:layout_marginTop="9dp"
-        android:layout_marginEnd="2dp"
-        android:text="-"
-        android:textAlignment="textEnd"
-        android:textColor="@color/colorLight" />
+                <androidx.constraintlayout.widget.ConstraintLayout
+                    android:id="@+id/constraintLayout"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent">
 
-    <ImageView
-        android:id="@+id/batt_image_view"
-        android:layout_width="30dp"
-        android:layout_height="30dp"
-        android:layout_alignTop="@+id/battery_text_view"
-        android:layout_alignEnd="@+id/rssi_image_view"
-        android:layout_marginTop="-5dp"
-        android:layout_marginEnd="-3dp"
-        app:srcCompat="@drawable/ic_sync_black_24dp" />
+                    <TextView
+                        android:id="@+id/battery_text_view"
+                        android:layout_width="40dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="2dp"
+                        android:text="-"
+                        app:layout_constraintBottom_toBottomOf="@+id/batt_image_view"
+                        app:layout_constraintStart_toEndOf="@+id/batt_image_view"
+                        app:layout_constraintTop_toTopOf="@+id/batt_image_view" />
 
-    <ImageView
-        android:id="@+id/rssi_image_view"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignTop="@+id/rssi_text_view"
-        android:layout_alignParentEnd="true"
-        android:layout_marginTop="-3dp"
-        android:layout_marginEnd="10dp"
-        app:srcCompat="@drawable/ic_signal_cellular_3_bar_black_24dp" />
+                    <ImageView
+                        android:id="@+id/batt_image_view"
+                        android:layout_width="25dp"
+                        android:layout_height="25dp"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent"
+                        app:srcCompat="@drawable/ic_battery_50_black_24dp" />
+                </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <Button
-        android:id="@+id/add_device_button"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:layout_alignParentStart="true"
-        android:layout_alignParentTop="true"
-        android:layout_marginStart="4dp"
-        android:layout_marginTop="8dp"
-        android:background="@drawable/ic_add_circle_outline_black_24dp"
-        android:backgroundTint="@color/colorAccent" />
+                <androidx.constraintlayout.widget.ConstraintLayout
+                    android:id="@+id/constraintLayout4"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toEndOf="@+id/constraintLayout"
+                    app:layout_constraintTop_toTopOf="parent">
 
-</RelativeLayout>
+                    <TextView
+                        android:id="@+id/samples_text_view"
+                        android:layout_width="40dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="5dp"
+                        android:text="-"
+                        android:textColor="@color/colorText"
+                        app:layout_constraintBottom_toBottomOf="@+id/samples_image_view"
+                        app:layout_constraintStart_toEndOf="@+id/samples_image_view"
+                        app:layout_constraintTop_toTopOf="@+id/samples_image_view" />
+
+                    <ImageView
+                        android:id="@+id/samples_image_view"
+                        android:layout_width="25dp"
+                        android:layout_height="25dp"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent"
+                        app:srcCompat="@drawable/ic_sync_black_24dp" />
+
+                </androidx.constraintlayout.widget.ConstraintLayout>
+
+                <androidx.constraintlayout.widget.ConstraintLayout
+                    android:id="@+id/constraintLayout5"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:layout_constraintEnd_toStartOf="@+id/constraintLayout"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent">
+
+                    <ImageView
+                        android:id="@+id/rssi_image_view"
+                        android:layout_width="25dp"
+                        android:layout_height="25dp"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent"
+                        app:srcCompat="@drawable/ic_signal_cellular_3_bar_black_24dp" />
+
+                    <TextView
+                        android:id="@+id/rssi_text_view"
+                        android:layout_width="40dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:text="-"
+                        android:textColor="@color/colorText"
+                        app:layout_constraintBottom_toBottomOf="@+id/rssi_image_view"
+                        app:layout_constraintStart_toEndOf="@+id/rssi_image_view"
+                        app:layout_constraintTop_toTopOf="@+id/rssi_image_view" />
+                </androidx.constraintlayout.widget.ConstraintLayout>
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:id="@+id/constraintLayout2"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintHorizontal_bias="0.495"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@+id/constraintLayout3">
+
+                <TextView
+                    android:id="@+id/textView_move_id"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="192630003196"
+                    android:textSize="18sp"
+                    app:layout_constraintStart_toStartOf="@+id/textView_physical"
+                    app:layout_constraintTop_toBottomOf="@+id/textView_physical" />
+
+                <TextView
+                    android:id="@+id/id_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Movesense ID "
+                    android:textStyle="bold"
+                    app:layout_constraintBottom_toBottomOf="@+id/textView_move_id"
+                    app:layout_constraintEnd_toEndOf="@+id/address_Label"
+                    app:layout_constraintTop_toTopOf="@+id/textView_move_id" />
+
+                <TextView
+                    android:id="@+id/textView_physical"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:text="0C:8C:DC:2E:32:67 "
+                    android:textSize="18sp"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toEndOf="@+id/address_Label"
+                    app:layout_constraintTop_toTopOf="parent" />
+
+                <TextView
+                    android:id="@+id/address_Label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Physical Address "
+                    android:textStyle="bold"
+                    app:layout_constraintBottom_toBottomOf="@+id/textView_physical"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="@+id/textView_physical" />
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+            <TableRow
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginTop="8dp"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@+id/constraintLayout2">
+
+                <androidx.constraintlayout.widget.ConstraintLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1">
+
+                    <Button
+                        android:id="@+id/connect_button"
+                        android:layout_width="wrap_content"
+                        android:layout_height="45dp"
+                        android:layout_marginBottom="8dp"
+                        android:backgroundTint="@color/colorAccent"
+                        android:paddingLeft="30dp"
+                        android:paddingRight="30dp"
+                        android:text="Disconnect"
+                        app:cornerRadius="6dp"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintHorizontal_bias="0.65"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent" />
+                </androidx.constraintlayout.widget.ConstraintLayout>
+
+                <androidx.constraintlayout.widget.ConstraintLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1">
+
+                    <Button
+                        android:id="@+id/rename_button"
+                        android:layout_width="wrap_content"
+                        android:layout_height="45dp"
+                        android:layout_marginBottom="8dp"
+                        android:backgroundTint="@color/colorAccent"
+                        android:lineSpacingExtra="8sp"
+                        android:paddingLeft="30dp"
+                        android:paddingRight="30dp"
+                        android:text="Rename"
+                        app:cornerRadius="6dp"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintHorizontal_bias="0.35"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent" />
+                </androidx.constraintlayout.widget.ConstraintLayout>
+
+            </TableRow>
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/main_view"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="8dp"
+            android:layout_marginBottom="8dp"
+            app:layout_constraintBottom_toTopOf="@id/addition_details"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <ImageView
+                android:id="@+id/movesense_icon"
+                android:layout_width="70dp"
+                android:layout_height="70dp"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:srcCompat="@drawable/movesense_icon" />
+
+            <ImageView
+                android:id="@+id/status_dot"
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:layout_marginStart="64dp"
+                android:elevation="1dp"
+                android:scaleType="centerInside"
+                android:tint="@color/colorPrimary"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:srcCompat="@drawable/circle" />
+
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:id="@+id/device_name_layout"
+                android:layout_width="0dp"
+                android:layout_height="30dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginTop="6dp"
+                app:layout_constraintEnd_toStartOf="@+id/expand_icon"
+                app:layout_constraintStart_toEndOf="@+id/movesense_icon"
+                app:layout_constraintTop_toTopOf="parent">
+
+                <!--                <TextView-->
+                <!--                    android:id="@+id/ble_device_name"-->
+                <!--                    android:layout_width="0dp"-->
+                <!--                    android:layout_height="wrap_content"-->
+                <!--                    android:text="-"-->
+                <!--                    android:textColor="@color/colorPrimary"-->
+                <!--                    android:textSize="24sp"-->
+                <!--                    app:layout_constraintBottom_toBottomOf="parent"-->
+                <!--                    app:layout_constraintEnd_toEndOf="parent"-->
+                <!--                    app:layout_constraintStart_toStartOf="parent"-->
+                <!--                    app:layout_constraintTop_toTopOf="parent" />-->
+
+                <EditText
+                    android:id="@+id/ble_device_name_edit"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:background="@color/colorWhite"
+                    android:enabled="false"
+                    android:inputType="text"
+                    android:text="-"
+                    android:textColor="@color/colorPrimary"
+                    android:textSize="24sp"
+                    android:visibility="visible"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent" />
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+
+            <TextView
+                android:id="@+id/connection_state_id"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:text="-"
+                android:textColor="@color/colorText"
+                android:textSize="16sp"
+                app:layout_constraintEnd_toStartOf="@+id/expand_icon"
+                app:layout_constraintStart_toStartOf="@+id/device_name_layout"
+                app:layout_constraintTop_toBottomOf="@+id/device_name_layout" />
+
+            <ImageView
+                android:id="@+id/expand_icon"
+                android:layout_width="30dp"
+                android:layout_height="wrap_content"
+                android:tint="@color/colorText"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:srcCompat="@drawable/ic_expand_more_black_24dp" />
+
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</androidx.cardview.widget.CardView>

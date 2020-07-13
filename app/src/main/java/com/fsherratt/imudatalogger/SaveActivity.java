@@ -1,23 +1,18 @@
 package com.fsherratt.imudatalogger;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
-import android.app.Activity;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.util.Log;
-import android.util.Log;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
+import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.PopupWindow;
-import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -54,7 +49,7 @@ public class SaveActivity extends AppCompatActivity {
 
     private EditText mDescription;
     private EditText mHeight;
-    private Spinner mGender;
+    private AutoCompleteTextView mGender;
     private Button mUpload;
 
 
@@ -67,20 +62,17 @@ public class SaveActivity extends AppCompatActivity {
         Intent intent = getIntent();
         mfileName = intent.getStringExtra(EXTRA_FILENAME);
 
-        mFileName_UI = (TextView)findViewById(R.id.file_name_text);
-        mFileSize_UI = (TextView)findViewById(R.id.file_size_text);
         mDescription = (EditText)findViewById(R.id.Description_Input);
         mHeight = (EditText)findViewById(R.id.height_input);
-        mGender = (Spinner)findViewById(R.id.gender_spinner);
+        mGender = (AutoCompleteTextView) findViewById(R.id.gender_spinner);
         mUpload = (Button)findViewById(R.id.upload_button);
 
+        final ArrayList<String> genderList = new ArrayList<>(Arrays.asList(getResources().getStringArray(R.array.gender_options)));
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, R.layout.list_item, genderList);
+        mGender.setAdapter(adapter);
         getFiles();
-        getFileSize();
-        mFileName_UI.setText(mfileName + ".txt");
 
         mAuth = FirebaseAuth.getInstance();
-
-        setUpSpinner();
 
         Log.d(TAG, mfileName);
     }
@@ -106,37 +98,6 @@ public class SaveActivity extends AppCompatActivity {
         mAuth.signOut();
         finish();
     }
-
-    private void setUpSpinner() {
-        // Spinner
-        final ArrayList<String> genderList = new ArrayList<>(Arrays.asList(getResources().getStringArray(R.array.gender_options)));
-        final ArrayAdapter<String> genderAdapter = new ArrayAdapter<String>(this, R.layout.spinner_item, genderList) {
-            @Override
-            public View getDropDownView(int position, @Nullable View convertView, @NonNull ViewGroup parent) {
-                View view = super.getDropDownView(position, convertView, parent);
-                TextView tv = (TextView)view;
-
-                if (position == 0) {
-                    tv.setTextColor(getResources().getColor(R.color.colorLight));
-                }
-
-                return view;
-            }
-
-            @Override
-            public boolean isEnabled(int position) {
-                if(position == 0) {
-                    return false;
-                } else {
-                    return true;
-                }
-            }
-        };
-
-        genderAdapter.setDropDownViewResource(R.layout.spinner_item);
-        mGender.setAdapter(genderAdapter);
-    }
-
 
     // UI Uploading Popup
     private PopUpClass mPopUpWindow;
@@ -182,8 +143,8 @@ public class SaveActivity extends AppCompatActivity {
         mPopUpWindow.setProgressBar(progress);
     }
 
-    private void setButtonText(String text) {
-        mPopUpWindow.setButtonName(text);
+    private void setButtonDone(Boolean state) {
+        mPopUpWindow.setButtonDone(state);
     }
 
     private void setTitleText(String title) {
@@ -224,6 +185,8 @@ public class SaveActivity extends AppCompatActivity {
         Toast.makeText(this, "Succsefully connected to Firebase as UID " + mCurrentUser.getUid(), Toast.LENGTH_SHORT).show();
 
         mUpload.setEnabled(true);
+        mUpload.setBackgroundColor(getColor(R.color.colorAccent));
+        mUpload.setTextColor(getColor(R.color.colorWhite));
         setupStorage();
     }
 
@@ -254,10 +217,7 @@ public class SaveActivity extends AppCompatActivity {
         FileFilter filter = new FileFilter() {
             @Override
             public boolean accept(File pathname) {
-                if (pathname.getName().contains(mfileName)) {
-                    return true;
-                }
-                return false;
+                return pathname.getName().contains(mfileName);
             }
         };
         mfileList = new ArrayList<File>( Arrays.asList(dir.listFiles(filter)) );
@@ -270,16 +230,16 @@ public class SaveActivity extends AppCompatActivity {
         }
 
         mFileSize = size;
-        mFileSize_UI.setText(String.valueOf(mFileSize) + "Mb");
+//        mFileSize_UI.setText(mFileSize + "Mb");
     }
 
     private void saveMetaData() {
         String metaFileName = mfileName + "_meta.txt";
 
-        String timestamp = "timestamp: " + mfileName;
-        String gender =  "gender: " + mGender.getSelectedItem().toString();
-        String height = "height: " + mHeight.getText().toString();
-        String description = "description: " + mDescription.getText().toString();
+        String file = "file: " + mfileName + System.getProperty("line.separator");
+        String gender =  "gender: " + mGender.getText().toString() + System.getProperty("line.separator");
+        String height = "height: " + mHeight.getText().toString() + System.getProperty("line.separator");
+        String description = "description: " + mDescription.getText().toString() + System.getProperty("line.separator");
 
         FileOutputStream fileStream = logService.openFileStream(this, metaFileName);
 
@@ -289,7 +249,7 @@ public class SaveActivity extends AppCompatActivity {
         }
 
         try {
-            fileStream.write(timestamp.getBytes());
+            fileStream.write(file.getBytes());
             fileStream.write(gender.getBytes());
             fileStream.write(height.getBytes());
             fileStream.write(description.getBytes());
@@ -321,7 +281,8 @@ public class SaveActivity extends AppCompatActivity {
 
     private void allUploaded() {
         setTitleText("Success");
-        setButtonText("Close");
+        setButtonDone(true);
+
         setFileName("All files successfully uploaded");
         mUpload.setEnabled(false);
         mUploadSuccess = true;
@@ -360,6 +321,7 @@ public class SaveActivity extends AppCompatActivity {
         }
 
         Uri fileUri = Uri.fromFile(file);
+
         StorageReference storageReference = mStorage.getReference(mfileName + "/" + fileUri.getLastPathSegment());
         storageReference.getStorage().setMaxUploadRetryTimeMillis(1000*60*1); // Timeout after 1 minutes
         setFileName(fileUri.getLastPathSegment());
@@ -400,7 +362,7 @@ public class SaveActivity extends AppCompatActivity {
         mUploadTask = null;
         setTitleText("Error");
         setFileName("Upload Failed: Please try again");
-        setButtonText("Close");
+        setButtonDone(false);
     }
 
     private void fileUploadCancelled() {

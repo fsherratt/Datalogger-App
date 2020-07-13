@@ -10,7 +10,6 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.graphics.drawable.Drawable;
 import android.location.LocationManager;
 import android.os.Handler;
 
@@ -20,14 +19,16 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.util.Log;
-import android.view.ActionMode;
 import android.view.ContextMenu;
+import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
@@ -41,10 +42,14 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 
+import androidx.cardview.widget.CardView;
+import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
+
 import no.nordicsemi.android.support.v18.scanner.BluetoothLeScannerCompat;
 import no.nordicsemi.android.support.v18.scanner.ScanSettings;
 import no.nordicsemi.android.support.v18.scanner.ScanFilter;
@@ -59,14 +64,16 @@ public class MainActivity extends AppCompatActivity {
 
     private Menu mMenu;
     private Button mRecord;
-    private ProgressBar mProgressBar;
 
     private Handler mHandler;
     private Runnable mRssiRunable;
+    private Runnable mBattRunable;
 
     private BleServiceHolder mBleServices;
     private logServiceHolder mLogService;
     private recyclerViewHolder mRecyclerHolder;
+
+    private SwipeRefreshLayout mSwipeRefresh;
 
     // Lifecycle code
     @Override
@@ -78,9 +85,15 @@ public class MainActivity extends AppCompatActivity {
 
         mRecord = findViewById(R.id.ble_record_button);
 
-        mProgressBar = findViewById(R.id.ble_refresh_progress_bar);
+        mSwipeRefresh = findViewById(R.id.devices_swipe_refresh);
+        mSwipeRefresh.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
+            @Override
+            public void onRefresh() {
+                startScanner();
+            }
+        });
 
-        mProgressBar.setIndeterminate(false);
+        mSwipeRefresh.setRefreshing(false);
 
         mBleServices = new BleServiceHolder(this);
         mLogService = new logServiceHolder(this);
@@ -94,12 +107,23 @@ public class MainActivity extends AppCompatActivity {
             public void run() {
                 ArrayList<String> devices = new ArrayList<>(mDevices.keySet());
                 mBleServices.requestRssi(devices);
-//                mBleServices.requestBatteryLevel(devices);
 
                 mHandler.postDelayed(this, 5000);
             }
         };
         mHandler.postDelayed(mRssiRunable, 5000);
+
+
+        mBattRunable = new Runnable() {
+            @Override
+            public void run() {
+                ArrayList<String> devices = new ArrayList<>(mDevices.keySet());
+                mBleServices.requestBatteryLevel(devices);
+
+                mHandler.postDelayed(this, 30000);
+            }
+        };
+        mHandler.postDelayed(mBattRunable, 30000);
     }
 
     @Override
@@ -137,14 +161,8 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-            case R.id.refresh_ble:
-                toggleScanner();
-                break;
-            case R.id.ble_disconnect:
-                disconnectAllDevices();
-                stopRecording();
-                break;
+        if (item.getItemId() == R.id.refresh_ble) {
+            toggleScanner();
         }
 
         return super.onOptionsItemSelected(item);
@@ -155,7 +173,26 @@ public class MainActivity extends AppCompatActivity {
                                     ContextMenu.ContextMenuInfo menuInfo) {
         super.onCreateContextMenu(menu, v, menuInfo);
         MenuInflater inflater = getMenuInflater();
-        inflater.inflate(R.menu.selected_context_menu, menu);
+        inflater.inflate(R.menu.main_menu, menu);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        switch (permissions[0]) {
+            case  Manifest.permission.ACCESS_FINE_LOCATION:
+                Log.d(TAG, "Location permission granted");
+                startScanner();
+                break;
+
+            case Manifest.permission.WRITE_EXTERNAL_STORAGE:
+                Log.d(TAG, "Writing permission granted");
+                startRecording();
+                break;
+
+            default:
+        }
     }
 
     // UI Elements
@@ -171,8 +208,8 @@ public class MainActivity extends AppCompatActivity {
         if (device == null)
             return;
 
-        device.setSelected( !device.selected );
-        updateActionBar();
+        device.setSelected( !device.itemExpanded );
+//        updateActionBar();
     }
 
     public void action_label_button(View view) {
@@ -213,14 +250,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private Button lastClicked = null;
-    private Drawable lastClickedDrawable = null;
 
     private void clearButtonHighlight() {
         if (lastClicked != null) {
-            lastClicked.setBackgroundDrawable(lastClickedDrawable);//getDrawable(android.R.drawable.btn_default));
             lastClicked.setTextColor(getColor(R.color.colorBlack));
+            lastClicked.setBackgroundColor(getColor(R.color.colorLight));
 
-            lastClickedDrawable = null;
             lastClicked = null;
         }
     }
@@ -230,11 +265,10 @@ public class MainActivity extends AppCompatActivity {
 
         Button clickedButton = findViewById(id);
 
-        lastClickedDrawable = clickedButton.getBackground();
         lastClicked = clickedButton;
 
-        clickedButton.setBackgroundColor(getColor(R.color.colorAccent));
         clickedButton.setTextColor(getColor(R.color.colorWhite));
+        clickedButton.setBackgroundColor(getColor(R.color.colorAccent));
 
 
     }
@@ -249,56 +283,13 @@ public class MainActivity extends AppCompatActivity {
 
         recyclerView.setAdapter(mRecyclerHolder);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
-        recyclerView.setAnimation(null);
+        recyclerView.setItemAnimator(null);
 
-        registerForContextMenu(findViewById(R.id.main_linearLayout));
+        registerForContextMenu(findViewById(R.id.main_constrainedLayout));
     }
 
     // BLE Devices
     private HashMap<String, BleDevices> mDevices = new HashMap<>();
-
-    public void disconnectAllDevices() {
-        if (mBleServices == null) {
-            Log.d(TAG, "disconnectAllDevices: No devices connected");
-            return;
-        }
-
-        mBleServices.disconnectAll();
-    }
-
-    // Selected items function
-    public int countSelected() {
-        int selectCount = 0;
-        for ( BleDevices device : mDevices.values()) {
-
-            if (device.selected )
-                selectCount++;
-        }
-
-        return selectCount;
-    }
-
-    public void connectSelected(Boolean connect) {
-        ArrayList<String> selectList = new ArrayList<>();
-        for ( BleDevices device : mDevices.values()) {
-            if (device.selected )
-                selectList.add(device.address);
-        }
-
-        if (selectList.size() == 0 )
-            return;
-
-        if (connect)
-            mBleServices.connect(selectList);
-        else
-            mBleServices.disconnect(selectList);
-    }
-
-    public void clearSelected() {
-        for ( BleDevices device : mDevices.values()) {
-            device.setSelected(false);
-        }
-    }
 
 
     // BLE Device updates
@@ -378,19 +369,22 @@ public class MainActivity extends AppCompatActivity {
                 int err = intent.getIntExtra(logService.EXTRA_ERROR, 0);
 
                 if (err == logService.FREQ_ERROR_NO_UPDATE) {
-                    String name = mDevices.get(address).friendlyName;
-                    if (name == null) {
-                        name = mDevices.get(address).name;
+                    BleDevices bleDevice =  mDevices.get(address);
+                    if (bleDevice == null ) {
+                        return;
                     }
 
-                    View contextView = findViewById(android.R.id.content).getRootView();
+                    String name = bleDevice.friendlyName;
+                    if (name == null) {
+                        name = bleDevice.name;
+                    }
+
+                    device.errorMessage = "Error: Streaming failed";
+                    device.setConnectionStatus(bleService.DEVICE_STATE_ERROR);
+
+                    View contextView = findViewById(android.R.id.content);
                     Snackbar snackbar = Snackbar.make(contextView, "Error with sensor " + name, Snackbar.LENGTH_INDEFINITE);
-                    snackbar.setAction("Close", new View.OnClickListener() {
-                        @Override
-                        public void onClick(View v) {
-                            snackbar.dismiss();
-                        }
-                    });
+                    snackbar.setAction("Close", v -> snackbar.dismiss());
                     snackbar.show();
                 }
 
@@ -418,11 +412,11 @@ public class MainActivity extends AppCompatActivity {
 
         if (PackageManager.PERMISSION_DENIED == ContextCompat.checkSelfPermission(
                 MainActivity.this,
-                Manifest.permission.ACCESS_COARSE_LOCATION))
+                Manifest.permission.ACCESS_FINE_LOCATION))
         {
             Log.d(TAG, "startScanner: Permission denied");
             ActivityCompat.requestPermissions(MainActivity.this,
-                    new String[] {Manifest.permission.ACCESS_COARSE_LOCATION},
+                    new String[] {Manifest.permission.ACCESS_FINE_LOCATION},
                     100);
         }
 
@@ -443,14 +437,13 @@ public class MainActivity extends AppCompatActivity {
         Log.d(TAG, "stopScanner: Scan started");
 
         mScanning = true;
+        mSwipeRefresh.setRefreshing(true);
 
         if (mMenu != null) {
-            mMenu.getItem(1).setIcon(ContextCompat.getDrawable(this, R.drawable.ic_cancel_black_24dp));
+            mMenu.getItem(0).setIcon(ContextCompat.getDrawable(this, R.drawable.ic_cancel_black_24dp));
         }
 
-        mProgressBar.setIndeterminate(true);
-
-        mHandler.postDelayed(mScanTimeout, 10000);
+        mHandler.postDelayed(mScanTimeout, 2500);
     }
 
     public void stopScanner() {
@@ -462,12 +455,11 @@ public class MainActivity extends AppCompatActivity {
 
         Log.d(TAG, "stopScanner: Scan stopped");
         mScanning = false;
+        mSwipeRefresh.setRefreshing(false);
 
         if (mMenu != null) {
-            mMenu.getItem(1).setIcon(ContextCompat.getDrawable(this, R.drawable.ic_refresh_black_24dp));
+            mMenu.getItem(0).setIcon(ContextCompat.getDrawable(this, R.drawable.ic_refresh_black_24dp));
         }
-
-        mProgressBar.setIndeterminate(false);
 
         mHandler.removeCallbacks(mScanTimeout);
 
@@ -514,12 +506,12 @@ public class MainActivity extends AppCompatActivity {
         return true;
     }
 
-
     private ScanCallback mScanCallback = new ScanCallback() {
         @Override
         public void onBatchScanResults(final List<ScanResult> results) {
             BluetoothDevice device;
 
+            ArrayList<String> selectList = new ArrayList<>();
             for (final ScanResult result : results) {
                 device = result.getDevice();
                 String name = device.getName();
@@ -542,8 +534,13 @@ public class MainActivity extends AppCompatActivity {
                 mDevices.put(device.getAddress(), deviceHolder);
                 mRecyclerHolder.addDevice(deviceHolder);
 
+                selectList.add(device.getAddress());
+
                 Log.d(TAG, "onBatchScanResults: Added device: " + device.getName() + " " + device.getAddress());
             }
+
+            mBleServices.connect(selectList);
+            mBleServices.requestBatteryLevel(selectList);
         }
 
         @Override
@@ -566,17 +563,15 @@ public class MainActivity extends AppCompatActivity {
         return false;
     }
 
-    public boolean startRecording(View view) {
+    public void startRecording() {
         if (!AnyDeviceConnected()) {
-            Snackbar snackbar = Snackbar.make(view, "No devices connected", Snackbar.LENGTH_SHORT);
-            snackbar.setAction("Close", new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    snackbar.dismiss();
-                }
-            });
+            View contextView = findViewById(android.R.id.content);
+//            View contextView = Activity.getCurrentFocus();
+
+            Snackbar snackbar = Snackbar.make(contextView, "No devices connected", Snackbar.LENGTH_SHORT);
+            snackbar.setAction("Close", v -> snackbar.dismiss());
             snackbar.show();
-            return false;
+            return;
         }
 
         if (PackageManager.PERMISSION_DENIED == ContextCompat.checkSelfPermission(MainActivity.this,
@@ -586,76 +581,54 @@ public class MainActivity extends AppCompatActivity {
             ActivityCompat.requestPermissions(MainActivity.this,
                     new String[] {Manifest.permission.WRITE_EXTERNAL_STORAGE},
                     100);
-            return false;
+            return;
         }
+
+        recording = true;
+        mRecord.setText(getString(R.string.record_stop));
+        mRecord.setBackgroundColor(getColor(R.color.colorAccent));
+        mRecord.setTextColor(getColor(R.color.colorWhite));
+
+        mRecord.setCompoundDrawablesWithIntrinsicBounds(getDrawable(R.drawable.ic_stop_box), null, null, null);
 
         mLogService.startRecording();
         mBleServices.startRecording(new ArrayList<>(mDevices.keySet()));
-
-        return true;
     }
 
     public void stopRecording() {
         mLogService.stopRecording();
         mBleServices.stopRecording(new ArrayList<>(mDevices.keySet()));
+
+        recording = false;
+
+        clearButtonHighlight();
+        mRecord.setText(getString(R.string.record_start));
+        mRecord.setBackgroundColor(getColor(R.color.colorLight));
+        mRecord.setTextColor(getColor(R.color.colorBlack));
+
+        mRecord.setCompoundDrawablesWithIntrinsicBounds(getDrawable(R.drawable.circle), null, null, null);
+
+        launchSaveActivity();
     }
 
     public void toggleRecording(View view) {
         if (recording) {
-            recording = false;
-            clearButtonHighlight();
-            mRecord.setText(getString(R.string.record_start));
-
             stopRecording();
-            launchSaveActivity();
         } else {
-            if (startRecording(view) ) {
-                recording = true;
-                mRecord.setText(getString(R.string.record_stop));
-            }
+            startRecording();
         }
     }
 
     public void updateFileName(String filename) {
         mRecordingFileName = filename;
     }
+
     public void launchSaveActivity() {
         Intent intent = new Intent(this, SaveActivity.class);
         intent.putExtra(SaveActivity.EXTRA_FILENAME, mRecordingFileName);
         startActivity(intent);
     }
 
-
-    // Friendly names
-    @SuppressLint("RestrictedApi")
-    public void editFriendlyName(String address) {
-        BleDevices device = mDevices.get(address);
-        if (device == null)
-            return;
-
-        AlertDialog.Builder alert = new AlertDialog.Builder(this);
-
-        final EditText edittext = new EditText(this);
-        edittext.setSingleLine();
-
-        if (device.friendlyName != null)
-            edittext.setText(device.friendlyName);
-        else
-            edittext.setText(getString(R.string.default_friendly_name));
-
-        alert.setMessage("For device " + device.name);
-        alert.setTitle("Set Friendly Name");
-
-        //noinspection deprecation
-        alert.setView(edittext, 50, 0, 50, 0);
-
-        alert.setPositiveButton("OK", (dialog, whichButton) -> saveFriendlyName(address, edittext.getText().toString()));
-
-        alert.setNegativeButton("Reset", (dialog, whichButton) -> clearFriendlyName(address) );
-
-        alert.setCancelable(true);
-        alert.show();
-    }
 
     public void saveFriendlyName(String address, String newName) {
         BleDevices device = mDevices.get(address);
@@ -701,12 +674,17 @@ public class MainActivity extends AppCompatActivity {
         String address;
         String name;
         String friendlyName;
+
         int connectionStatus;
         int rssi;
         int batt;
         int freq;
 
-        boolean selected;
+        Boolean itemExpanded;
+        Boolean editing;
+        Boolean enableEdit;
+
+        String errorMessage;
 
         BleDevices(BluetoothDevice device) {
             setup(device);
@@ -726,7 +704,9 @@ public class MainActivity extends AppCompatActivity {
             this.rssi = 0;
             this.batt = 0;
 
-            this.selected = false;
+            this.itemExpanded = false;
+            this.editing = false;
+            this.enableEdit = false;
         }
 
         void setConnectionStatus(int connectionStatus) {
@@ -736,6 +716,8 @@ public class MainActivity extends AppCompatActivity {
                 this.rssi = 0;
                 this.batt = 0;
                 this.freq = 0;
+            } else if (connectionStatus == bleService.DEVICE_STATE_ERROR) {
+                errorMessage = "Error: During Connection";
             }
 
             mRecyclerHolder.updateItem(address);
@@ -752,7 +734,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         void setSelected( boolean selected ) {
-            this.selected = selected;
+            this.itemExpanded = selected;
             mRecyclerHolder.updateItem(address);
         }
 
@@ -763,6 +745,15 @@ public class MainActivity extends AppCompatActivity {
 
         void setFriendlyName(String friendlyName) {
             this.friendlyName = friendlyName;
+            mRecyclerHolder.updateItem(address);
+        }
+
+        void setEditing(Boolean newMode) {
+            editing = newMode;
+
+            if (newMode)
+                enableEdit = true;
+
             mRecyclerHolder.updateItem(address);
         }
     }
@@ -796,11 +787,6 @@ public class MainActivity extends AppCompatActivity {
             mContext.sendBroadcast(intent);
         }
 
-        void disconnectAll() {
-            Intent intent = new Intent(bleService.ACTION_CLOSE_GATT_ALL);
-            mContext.sendBroadcast(intent);
-        }
-
         void startRecording(ArrayList<String> bleDevices) {
             Intent intent = new Intent(bleService.ACTION_START_STREAM_DEVICES);
             intent.putStringArrayListExtra(bleService.EXTRA_ADDRESS_LIST, bleDevices);
@@ -821,11 +807,11 @@ public class MainActivity extends AppCompatActivity {
             sendBroadcast(intent);
         }
 
-//        void requestBatteryLevel(ArrayList<String> bleDevices) {
-//            Intent intent = new Intent(bleService.ACTION_REQUEST_BATTERY_LEVEL);
-//            intent.putStringArrayListExtra(bleService.EXTRA_ADDRESS_LIST, bleDevices);
-//            sendBroadcast(intent);
-//        }
+        void requestBatteryLevel(ArrayList<String> bleDevices) {
+            Intent intent = new Intent(bleService.ACTION_REQUEST_BATTERY_LEVEL);
+            intent.putStringArrayListExtra(bleService.EXTRA_ADDRESS_LIST, bleDevices);
+            sendBroadcast(intent);
+        }
     }
 
     static class logServiceHolder {
@@ -917,30 +903,151 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
+        private int connectionStateToColor(int state) {
+            switch (state) {
+//                case bleService.DEVICE_STATE_DISCONNECTED:
+//                    return ContextCompat.getColor(mContext, R.color.colorLight);
+                case bleService.DEVICE_STATE_INITIALISING:
+                case bleService.DEVICE_STATE_CONNECTING:
+                case bleService.DEVICE_STATE_DISCOVERING:
+                    return ContextCompat.getColor(mContext, R.color.colorYellow);
+                case bleService.DEVICE_STATE_CONNECTED:
+                    return ContextCompat.getColor(mContext, R.color.colorPrimary);
+                case bleService.DEVICE_STATE_STREAMING:
+                    return ContextCompat.getColor(mContext, R.color.colorAccent);
+                default:
+                    return ContextCompat.getColor(mContext, R.color.colorLight);
+            }
+        }
+
         @Override
         public void onBindViewHolder(@NonNull ViewHolder viewHolder, int position) {
             BleDevices device = mDevices.get(position);
             viewHolder.address = device.address;
 
-            String rssi = String.valueOf(device.rssi);
-            String freq = String.valueOf(device.freq);
+            viewHolder.connectionState.setText(connectionStateToName(device.connectionStatus));
+            viewHolder.statusDot.setColorFilter(connectionStateToColor(device.connectionStatus));
 
-            viewHolder.deviceAddress.setText(connectionStateToName(device.connectionStatus));
+            viewHolder.deviceAddress.setText(device.address);
+            viewHolder.deviceID.setText(device.name);
 
-            if (device.friendlyName == null)
-                viewHolder.deviceName.setText(device.name);
-            else
-                viewHolder.deviceName.setText(device.friendlyName);
+            viewHolder.deviceRssi.setText(device.rssi + "dB");
+            viewHolder.deviceFreq.setText(String.valueOf(device.freq));
+            viewHolder.deviceBatt.setText(device.batt + "%");
 
-            viewHolder.deviceRssi.setText(rssi);
-            viewHolder.deviceFreq.setText(freq);
+            switch (device.connectionStatus) {
+                case bleService.DEVICE_STATE_DISCONNECTED:
+                    viewHolder.connectButton.setText("Connect");
+                    viewHolder.connectButton.setEnabled(true);
+                    viewHolder.connectButton.setBackgroundColor(getColor(R.color.colorAccent));
+                    viewHolder.connectButton.setTextColor(getColor(R.color.colorWhite));
 
-            if ( device.selected ) {
-                viewHolder.deviceAddButton.setBackground(ContextCompat.getDrawable(mContext, R.drawable.ic_add_circle_black_24dp));
+                    break;
+                case bleService.DEVICE_STATE_CONNECTING:
+                case bleService.DEVICE_STATE_INITIALISING:
+                case bleService.DEVICE_STATE_DISCOVERING:
+                    viewHolder.connectButton.setText("Connect");
+                    viewHolder.connectButton.setEnabled(false);
+                    viewHolder.connectButton.setBackgroundColor(getColor(R.color.colorLight));
+                    viewHolder.connectButton.setTextColor(getColor(R.color.colorText));
+                    break;
+
+                case bleService.DEVICE_STATE_ERROR:
+                    viewHolder.connectButton.setText("Disconnect");
+                    viewHolder.connectButton.setEnabled(true);
+                    viewHolder.connectButton.setBackgroundColor(getColor(R.color.colorLight));
+                    viewHolder.connectButton.setTextColor(getColor(R.color.colorBlack));
+                    break;
+
+                default:
+                    viewHolder.connectButton.setText("Disconnect");
+                    viewHolder.connectButton.setEnabled(true);
+                    viewHolder.connectButton.setBackgroundColor(getColor(R.color.colorAccent));
+                    viewHolder.connectButton.setTextColor(getColor(R.color.colorWhite));
             }
-            else {
-                viewHolder.deviceAddButton.setBackground(ContextCompat.getDrawable(mContext, R.drawable.ic_add_circle_outline_black_24dp));
+
+            if (device.itemExpanded) {
+                viewHolder.expandIcon.setImageDrawable(getDrawable(R.drawable.ic_expand_less_black_24dp));
+                viewHolder.mAdditionalDetails.setVisibility(View.VISIBLE);
+            } else {
+                viewHolder.expandIcon.setImageDrawable(getDrawable(R.drawable.ic_expand_more_black_24dp));
+                viewHolder.mAdditionalDetails.setVisibility(View.GONE);
             }
+
+            if (device.connectionStatus == bleService.DEVICE_STATE_ERROR) {
+                viewHolder.connectionState.setText(device.errorMessage);
+                setErrorState(viewHolder);
+            } else {
+                clearErrorState(viewHolder);
+            }
+
+            if (device.enableEdit) {
+                viewHolder.deviceNameEdit.setEnabled(true);
+                viewHolder.deviceNameEdit.requestFocus();
+                viewHolder.deviceNameEdit.setSelection(viewHolder.deviceNameEdit.getText().length());
+
+                InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                imm.showSoftInput(viewHolder.deviceNameEdit, InputMethodManager.SHOW_IMPLICIT);
+
+                viewHolder.renameButton.setText("Save");
+
+                device.enableEdit = false;
+            }
+
+            if (!device.editing) {
+                viewHolder.deviceNameEdit.setHint(device.name);
+                if (device.friendlyName == null)
+                    viewHolder.deviceNameEdit.setText(device.name);
+                else
+                    viewHolder.deviceNameEdit.setText(device.friendlyName);
+
+                viewHolder.deviceNameEdit.setEnabled(false);
+                viewHolder.renameButton.setText("Rename");
+            }
+        }
+
+        private void setErrorState(ViewHolder viewHolder) {
+            viewHolder.cardView.setCardBackgroundColor(getColor(R.color.colorError));
+            viewHolder.deviceNameEdit.setTextColor(getColor(R.color.colorWhite));
+            viewHolder.connectionState.setTextColor(getColor(R.color.colorWhite));
+
+            viewHolder.deviceRssi.setTextColor(getColor(R.color.colorWhite));
+            viewHolder.deviceFreq.setTextColor(getColor(R.color.colorWhite));
+            viewHolder.deviceBatt.setTextColor(getColor(R.color.colorWhite));
+
+            viewHolder.rssiImage.setColorFilter(ContextCompat.getColor(mContext, R.color.colorWhite));
+            viewHolder.battImage.setColorFilter(ContextCompat.getColor(mContext, R.color.colorWhite));
+            viewHolder.samplesImage.setColorFilter(ContextCompat.getColor(mContext, R.color.colorWhite));
+
+            viewHolder.deviceAddressLabel.setTextColor(getColor(R.color.colorWhite));
+            viewHolder.deviceIdLabel.setTextColor(getColor(R.color.colorWhite));
+            viewHolder.deviceAddress.setTextColor(getColor(R.color.colorWhite));
+            viewHolder.deviceID.setTextColor(getColor(R.color.colorWhite));
+
+            viewHolder.renameButton.setTextColor(getColor(R.color.colorBlack));
+            viewHolder.renameButton.setBackgroundColor(getColor(R.color.colorLight));
+        }
+
+        private void clearErrorState(ViewHolder viewHolder) {
+            viewHolder.cardView.setCardBackgroundColor(getColor(R.color.colorWhite));
+            viewHolder.deviceNameEdit.setTextColor(getColor(R.color.colorPrimary));
+            viewHolder.connectionState.setTextColor(getColor(R.color.colorText));
+
+            viewHolder.deviceRssi.setTextColor(getColor(R.color.colorText));
+            viewHolder.deviceFreq.setTextColor(getColor(R.color.colorText));
+            viewHolder.deviceBatt.setTextColor(getColor(R.color.colorText));
+
+            viewHolder.rssiImage.setColorFilter(ContextCompat.getColor(mContext, R.color.colorBlack));
+            viewHolder.battImage.setColorFilter(ContextCompat.getColor(mContext, R.color.colorBlack));
+            viewHolder.samplesImage.setColorFilter(ContextCompat.getColor(mContext, R.color.colorBlack));
+
+            viewHolder.deviceAddressLabel.setTextColor(getColor(R.color.colorText));
+            viewHolder.deviceIdLabel.setTextColor(getColor(R.color.colorText));
+            viewHolder.deviceAddress.setTextColor(getColor(R.color.colorText));
+            viewHolder.deviceID.setTextColor(getColor(R.color.colorText));
+
+            viewHolder.renameButton.setTextColor(getColor(R.color.colorWhite));
+            viewHolder.renameButton.setBackgroundColor(getColor(R.color.colorAccent));
         }
 
         @Override
@@ -948,135 +1055,138 @@ public class MainActivity extends AppCompatActivity {
             return mDevices.size();
         }
 
-        class ViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener, View.OnLongClickListener {
+        class ViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener {
             String address;
 
-            TextView deviceName;
-            TextView deviceAddress;
+            CardView cardView;
+            ConstraintLayout mAdditionalDetails;
+
+            ImageView statusDot;
+            ImageView expandIcon;
+
+            ImageView rssiImage;
+            ImageView battImage;
+            ImageView samplesImage;
+
+            EditText deviceNameEdit;
+
+            TextView connectionState;
             TextView deviceRssi;
             TextView deviceFreq;
+            TextView deviceBatt;
 
-            ImageView deviceRssiImage;
-            ImageView deviceFreqImage;
+            TextView deviceAddressLabel;
+            TextView deviceIdLabel;
+            TextView deviceAddress;
+            TextView deviceID;
 
-            Button deviceAddButton;
+            Button connectButton;
+            Button renameButton;
 
             ViewHolder(@NonNull View itemView)  {
                 super(itemView);
 
-                deviceName = itemView.findViewById(R.id.ble_device_name);
-                deviceAddress = itemView.findViewById(R.id.connection_state_id);
+                mAdditionalDetails = itemView.findViewById(R.id.addition_details);
+
+                cardView = itemView.findViewById(R.id.deviceCardView);
+                cardView.setOnClickListener(this);
+
+                deviceNameEdit = itemView.findViewById(R.id.ble_device_name_edit);
+                deviceNameEdit.setBackground(null);
+                deviceNameEdit.setOnEditorActionListener(new TextView.OnEditorActionListener() {
+                    @Override
+                    public boolean onEditorAction(TextView textView, int i, KeyEvent keyEvent) {
+                        if (i == EditorInfo.IME_ACTION_DONE || keyEvent.getKeyCode() == KeyEvent.KEYCODE_ENTER) {
+                            onNameClickCallback(address, textView.getText().toString());
+                            return true;
+                        } else if (i == EditorInfo.IME_FLAG_NAVIGATE_NEXT || keyEvent.getKeyCode() == KeyEvent.KEYCODE_BACK) {
+                            onNameClickCallback(address, null);
+                            return true;
+                        }
+
+                        return false;
+                    }
+                });
+
+                connectionState = itemView.findViewById(R.id.connection_state_id);
+                statusDot = itemView.findViewById(R.id.status_dot);
+                expandIcon = itemView.findViewById(R.id.expand_icon);
+
                 deviceRssi = itemView.findViewById(R.id.rssi_text_view);
-                deviceFreq = itemView.findViewById(R.id.battery_text_view);
+                deviceFreq = itemView.findViewById(R.id.samples_text_view);
+                deviceBatt = itemView.findViewById(R.id.battery_text_view);
 
-                deviceFreqImage = itemView.findViewById(R.id.batt_image_view);
-                deviceRssiImage = itemView.findViewById(R.id.rssi_image_view);
+                rssiImage = itemView.findViewById(R.id.rssi_image_view);
+                battImage = itemView.findViewById(R.id.batt_image_view);
+                samplesImage = itemView.findViewById(R.id.samples_image_view);
 
-                deviceAddButton = itemView.findViewById(R.id.add_device_button);
+                deviceAddressLabel = itemView.findViewById(R.id.address_Label);
+                deviceIdLabel = itemView.findViewById(R.id.id_label);
+                deviceAddress = itemView.findViewById(R.id.textView_physical);
+                deviceID = itemView.findViewById(R.id.textView_move_id);
 
-                deviceAddButton.setOnClickListener(this);
-                deviceName.setOnLongClickListener(this);
+                connectButton = itemView.findViewById(R.id.connect_button);
+                renameButton = itemView.findViewById(R.id.rename_button);
+
+                renameButton.setOnClickListener(this);
+                connectButton.setOnClickListener(this);
             }
 
             @Override
             public void onClick(View v) {
-                if (v == deviceAddButton) {
+                if (v == cardView) {
                     onButtonClickCallback(address);
+                    Log.d(TAG, "Cardview Pressed");
+                } else if (v == renameButton) {
+                    onNameClickCallback(address, deviceNameEdit.getText().toString());
+                } else if (v == connectButton) {
+                    onConnectClickCallback(address);
                 }
             }
+        }
 
-            @Override
-            public boolean onLongClick(View v) {
-                if (v == deviceName) {
-                    onNameClickCallback(address);
-                    return true;
-                }
-                return false;
+        private void onConnectClickCallback(String address) {
+            if (!mDeviceLocation.containsKey(address))
+                return;
+
+            //noinspection ConstantConditions
+            int pos = mDeviceLocation.get(address);
+
+
+            BleDevices device = mDevices.get(pos);
+
+            ArrayList<String> deviceList = new ArrayList<>();
+            deviceList.add(address);
+
+            if (device.connectionStatus != bleService.DEVICE_STATE_DISCONNECTED) {
+                mBleServices.disconnect(deviceList);
+            } else {
+                mBleServices.connect(deviceList);
             }
         }
 
         private void onButtonClickCallback(String address) {
             item_select_button(address);
+            updateItem(address);
         }
 
-        private void onNameClickCallback(String address) { editFriendlyName(address); }
-    }
+        private void onNameClickCallback(String address, String newName) {
+            if (!mDeviceLocation.containsKey(address))
+                return;
 
+            //noinspection ConstantConditions
+            int pos = mDeviceLocation.get(address);
 
-    // Action Mode Bar
-    ActionMode actionMode;
+            BleDevices device = mDevices.get(pos);
 
-    private void updateActionBar() {
-        int selectedItems = countSelected();
-
-        if (selectedItems == 0) {
-            stopActionMode();
-            return;
-        }
-
-        startActionMode();
-        actionMode.setSubtitle(selectedItems + " Items Selected");
-    }
-
-    private void startActionMode() {
-        if ( actionMode == null ) {
-            actionMode = startActionMode(actionModeCallback);
-
-            assert actionMode != null;
-            actionMode.setTitle("Connect/Disconnect");
-        }
-    }
-
-    private void stopActionMode() {
-        if ( actionMode != null )
-            actionMode.finish();
-    }
-
-
-    private ActionMode.Callback actionModeCallback = new ActionMode.Callback() {
-
-        // Called when the action mode is created; startActionMode() was called
-        @Override
-        public boolean onCreateActionMode(ActionMode mode, Menu menu) {
-            // Inflate a menu resource providing context menu items
-            MenuInflater inflater = mode.getMenuInflater();
-            inflater.inflate(R.menu.selected_context_menu, menu);
-            return true;
-        }
-
-        // Called each time the action mode is shown. Always called after onCreateActionMode, but
-        // may be called multiple times if the mode is invalidated.
-        @Override
-        public boolean onPrepareActionMode(ActionMode mode, Menu menu) {
-            return false; // Return false if nothing is done
-        }
-
-        // Called when the user selects a contextual menu item
-        @Override
-        public boolean onActionItemClicked(ActionMode mode, MenuItem item) {
-            switch (item.getItemId()) {
-                case R.id.connect:
-                    connectSelected(true);
-                    mode.finish(); // Action picked, so close the CAB
-                    return true;
-
-                case R.id.disconnect:
-                    connectSelected(false);
-                    mode.finish();
-                    return true;
-
-                default:
-                    mode.finish();
-                    return false;
+            if (device.editing) {
+                if (newName.equals(""))
+                    clearFriendlyName(address);
+                else if (newName != null)
+                    saveFriendlyName(address, newName);
             }
-        }
 
-        // Called when the user exits the action mode
-        @Override
-        public void onDestroyActionMode(ActionMode mode) {
-            // clear all selected items
-            clearSelected();
-            actionMode = null;
+            device.setEditing(!device.editing);
         }
-    };
+    }
 }

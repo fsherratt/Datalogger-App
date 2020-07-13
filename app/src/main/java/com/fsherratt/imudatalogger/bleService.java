@@ -62,7 +62,6 @@ public class bleService extends Service {
     public final static String EXTRA_ACTION = "com.fsherratt.imudatalogger.EXTRA_ACTION";
     public final static String EXTRA_RESULT = "com.fsherratt.imudatalogger.EXTRA_RESULT";
 
-    public final static int DEVICE_STATE_TIMEOUT = -2;
     public final static int DEVICE_STATE_ERROR = -1;
     public final static int DEVICE_STATE_DISCONNECTED = 0;
     public final static int DEVICE_STATE_INITIALISING = 1;
@@ -164,6 +163,7 @@ public class bleService extends Service {
         Log.d(TAG,  "connect: Found device");
 
         mConnectedDeviceMap.put(deviceAddress, new bleGattDevice(this, device));
+
         return true;
     }
 
@@ -724,6 +724,7 @@ public class bleService extends Service {
 
                 if (status == BluetoothGatt.GATT_SUCCESS) {
                     setConnectionState(DEVICE_STATE_CONNECTED);
+
                 } else {
                     setConnectionState(DEVICE_STATE_ERROR);
                 }
