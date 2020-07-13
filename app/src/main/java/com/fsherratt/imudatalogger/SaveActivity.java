@@ -13,20 +13,12 @@ import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.TextView;
 import android.widget.Toast;
 
-import com.google.android.gms.tasks.OnCanceledListener;
-import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.gms.tasks.OnFailureListener;
-import com.google.android.gms.tasks.OnSuccessListener;
-import com.google.android.gms.tasks.Task;
 import com.google.android.material.snackbar.Snackbar;
-import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.storage.FirebaseStorage;
-import com.google.firebase.storage.OnProgressListener;
 import com.google.firebase.storage.StorageReference;
 import com.google.firebase.storage.UploadTask;
 
@@ -36,6 +28,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Objects;
 
 public class SaveActivity extends AppCompatActivity {
     private static final String TAG = "SaveActivity";
@@ -44,15 +37,10 @@ public class SaveActivity extends AppCompatActivity {
 
     private String mfileName;
 
-    private TextView mFileName_UI;
-    private TextView mFileSize_UI;
-
     private EditText mDescription;
     private EditText mHeight;
     private AutoCompleteTextView mGender;
     private Button mUpload;
-
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -108,12 +96,7 @@ public class SaveActivity extends AppCompatActivity {
 
         mPopUpWindow = new PopUpClass(this);
 
-        mPopUpWindow.setOnDismissCallback(new PopUpClass.popupCallbacks() {
-            @Override
-            public void onDismiss() {
-                onDismissClass();
-            }
-        });
+        mPopUpWindow.setOnDismissCallback(this::onDismissClass);
 
         mPopUpWindow.showPopupWindow(view);
 
@@ -126,13 +109,16 @@ public class SaveActivity extends AppCompatActivity {
 
         if (mUploadTask != null) {
             cancelUpload();
-        } else if (!mUploadSuccess) {
             return;
-        } else {
-            mAuth.signOut();
-            finish();
-            Log.d(TAG, "Upload Success");
         }
+
+        if (!mUploadSuccess) {
+            return;
+        }
+
+        mAuth.signOut();
+        finish();
+        Log.d(TAG, "Upload Success");
     }
 
     private void setFileName(String file) {
@@ -162,18 +148,15 @@ public class SaveActivity extends AppCompatActivity {
 
         if (mCurrentUser == null) {
             // Perform anonymous login
-            mAuth.signInAnonymously().addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
-                @Override
-                public void onComplete(@NonNull Task task) {
-                    if (task.isSuccessful()) {
-                        mCurrentUser = mAuth.getCurrentUser();
-                        Log.d(TAG, "signInAnonymously:success");
-                        successfulLogin();
-                    } else {
-                        Log.d(TAG, "signInAnonymously:failed");
-                        mCurrentUser = null;
-                        failedLogin();
-                    }
+            mAuth.signInAnonymously().addOnCompleteListener(this, task -> {
+                if (task.isSuccessful()) {
+                    mCurrentUser = mAuth.getCurrentUser();
+                    Log.d(TAG, "signInAnonymously:success");
+                    successfulLogin();
+                } else {
+                    Log.d(TAG, "signInAnonymously:failed");
+                    mCurrentUser = null;
+                    failedLogin();
                 }
             });
         } else {
@@ -193,44 +176,23 @@ public class SaveActivity extends AppCompatActivity {
     private void failedLogin() {
         View contextView = findViewById(android.R.id.content).getRootView();
         Snackbar snackbar = Snackbar.make(contextView, "Failed to connect to Firebase, you can still save data locally", Snackbar.LENGTH_SHORT);
-        snackbar.setAction("Close", new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                snackbar.dismiss();
-            }
-        });
+        snackbar.setAction("Close", v -> snackbar.dismiss());
         snackbar.show();
 
-        mUpload.setText("Save");
+        mUpload.setText(R.string.upload_button_alt_text);
         mUpload.setEnabled(true);
     }
 
 
     // File Operations
-    float mFileSize = 0;
     ArrayList<File> mfileList = null;
     private void getFiles() {
         String logDir = getResources().getString(R.string.log_directory);
         String path = Environment.getExternalStorageDirectory().toString() + File.separator + logDir;
         File dir = new File(path);
 
-        FileFilter filter = new FileFilter() {
-            @Override
-            public boolean accept(File pathname) {
-                return pathname.getName().contains(mfileName);
-            }
-        };
-        mfileList = new ArrayList<File>( Arrays.asList(dir.listFiles(filter)) );
-    }
-
-    private void getFileSize() {
-        float size = 0;
-        for (File file : mfileList) {
-            size += Integer.parseInt(String.valueOf(file.length()/1024/1024));
-        }
-
-        mFileSize = size;
-//        mFileSize_UI.setText(mFileSize + "Mb");
+        FileFilter filter = pathname -> pathname.getName().contains(mfileName);
+        mfileList = new ArrayList<>( Arrays.asList(Objects.requireNonNull(dir.listFiles(filter))) );
     }
 
     private void saveMetaData() {
@@ -323,32 +285,15 @@ public class SaveActivity extends AppCompatActivity {
         Uri fileUri = Uri.fromFile(file);
 
         StorageReference storageReference = mStorage.getReference(mfileName + "/" + fileUri.getLastPathSegment());
-        storageReference.getStorage().setMaxUploadRetryTimeMillis(1000*60*1); // Timeout after 1 minutes
+        storageReference.getStorage().setMaxUploadRetryTimeMillis(1000*60); // Timeout after 1 minutes
         setFileName(fileUri.getLastPathSegment());
 
         mUploadTask = storageReference.putFile(fileUri);
 
-        mUploadTask.addOnFailureListener(new OnFailureListener() {
-            @Override
-            public void onFailure(@NonNull Exception exception) {
-                fileUploadFailed(exception);
-            }
-        }).addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
-            @Override
-            public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
-                fileUploadSuccess(taskSnapshot);
-            }
-        }).addOnProgressListener(new OnProgressListener<UploadTask.TaskSnapshot>() {
-            @Override
-            public void onProgress(@NonNull UploadTask.TaskSnapshot taskSnapshot) {
-                fileProgressListener(taskSnapshot);
-            }
-        }).addOnCanceledListener(new OnCanceledListener() {
-            @Override
-            public void onCanceled() {
-                fileUploadCancelled();
-            }
-        });
+        mUploadTask.addOnFailureListener(this::fileUploadFailed)
+                .addOnSuccessListener(this::fileUploadSuccess)
+                .addOnProgressListener(this::fileProgressListener)
+                .addOnCanceledListener(this::fileUploadCancelled);
     }
 
 

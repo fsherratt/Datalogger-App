@@ -22,6 +22,7 @@ import android.util.Log;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.Objects;
 import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.Semaphore;
@@ -251,6 +252,7 @@ public class bleService extends Service {
                 if ( currentAction == null)
                     return;
 
+                assert address != null;
                 if ( !address.equals(currentAction.mdevice))
                     return;
 
@@ -377,11 +379,15 @@ public class bleService extends Service {
                         deviceList = intent.getStringArrayListExtra(EXTRA_ADDRESS_LIST);
                 }
 
+                if (deviceList == null)
+                    return;
+
                 if (action == null)
                     return;
 
                 switch (action) {
                     case ACTION_ADD_GATT_DEVICES: {
+
                         for (String deviceAddress : deviceList) {
                             actionQueue.add(new BluetoothAction(ACTION_ADD_GATT_DEVICES, deviceAddress, String.valueOf(DEVICE_STATE_CONNECTED)));
                             actionQueue.add(new BluetoothAction(deviceAddress, ACTION_REQUEST_MTU, ACTION_SUCCESS));
@@ -784,7 +790,7 @@ public class bleService extends Service {
             try {
                 mCharWriteSemaphore.tryAcquire(1000, TimeUnit.MILLISECONDS);
             } catch ( InterruptedException e ) {
-                Log.e(TAG, e.getMessage() );
+                Log.e(TAG, Objects.requireNonNull(e.getMessage()));
                 return;
             }
 

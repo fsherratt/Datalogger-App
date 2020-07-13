@@ -280,18 +280,6 @@
                 app:layout_constraintStart_toEndOf="@+id/movesense_icon"
                 app:layout_constraintTop_toTopOf="parent">
 
-                <!--                <TextView-->
-                <!--                    android:id="@+id/ble_device_name"-->
-                <!--                    android:layout_width="0dp"-->
-                <!--                    android:layout_height="wrap_content"-->
-                <!--                    android:text="-"-->
-                <!--                    android:textColor="@color/colorPrimary"-->
-                <!--                    android:textSize="24sp"-->
-                <!--                    app:layout_constraintBottom_toBottomOf="parent"-->
-                <!--                    app:layout_constraintEnd_toEndOf="parent"-->
-                <!--                    app:layout_constraintStart_toStartOf="parent"-->
-                <!--                    app:layout_constraintTop_toTopOf="parent" />-->
-
                 <EditText
                     android:id="@+id/ble_device_name_edit"
                     android:layout_width="0dp"

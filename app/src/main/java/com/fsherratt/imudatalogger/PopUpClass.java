@@ -1,19 +1,17 @@
 package com.fsherratt.imudatalogger;
 
-import android.app.Activity;
 import android.content.Context;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.LayoutInflater;
-import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.PopupWindow;
 import android.widget.ProgressBar;
 import android.widget.TextView;
-import android.widget.Toast;
 
 public class PopUpClass  {
     private static final String TAG = "PopUpClass";
@@ -30,8 +28,8 @@ public class PopUpClass  {
     public PopUpClass(Context context) {
         mContext = context;
 
-        LayoutInflater inflater = (LayoutInflater) mContext.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
-        View popupView = inflater.inflate(R.layout.upload_popup, null);
+        LayoutInflater inflater = LayoutInflater.from(mContext);
+        View popupView = inflater.inflate(R.layout.upload_popup, (ViewGroup)null);
 
         mProgress = (ProgressBar)popupView.findViewById(R.id.upload_progressBar);
         mFileName = (TextView)popupView.findViewById(R.id.Filename_textview);
@@ -41,26 +39,13 @@ public class PopUpClass  {
         int width = LinearLayout.LayoutParams.MATCH_PARENT;
         int height = LinearLayout.LayoutParams.MATCH_PARENT;
 
-        //Make Inactive Items Outside Of PopupWindow
-        boolean focusable = true;
-
         //Create a window with our parameters
-        mPopupWindow = new PopupWindow(popupView, width, height, focusable);
+        mPopupWindow = new PopupWindow(popupView, width, height, true);
 
         mCancelButton = popupView.findViewById(R.id.cancelButton);
-        mCancelButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                mPopupWindow.dismiss();
-            }
-        });
+        mCancelButton.setOnClickListener(v -> mPopupWindow.dismiss());
 
-        mPopupWindow.setOnDismissListener(new PopupWindow.OnDismissListener() {
-            @Override
-            public void onDismiss() {
-                callback.onDismiss();
-            }
-        });
+        mPopupWindow.setOnDismissListener(() -> callback.onDismiss());
     }
 
     public void showPopupWindow(final View view) {
@@ -104,10 +89,6 @@ public class PopUpClass  {
             mCancelButton.setBackgroundColor(mContext.getColor(R.color.colorLight));
             mCancelButton.setTextColor(mContext.getColor(R.color.colorBlack));
         }
-    }
-
-    public void setButtonColor(int color) {
-
     }
 
     // Popup callbacks

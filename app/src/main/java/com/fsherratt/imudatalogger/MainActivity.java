@@ -1,7 +1,6 @@
 package com.fsherratt.imudatalogger;
 
 import android.Manifest;
-import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.BroadcastReceiver;
@@ -32,7 +31,6 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
-import android.widget.ProgressBar;
 import android.widget.TextView;
 
 import com.google.android.material.snackbar.Snackbar;
@@ -86,12 +84,7 @@ public class MainActivity extends AppCompatActivity {
         mRecord = findViewById(R.id.ble_record_button);
 
         mSwipeRefresh = findViewById(R.id.devices_swipe_refresh);
-        mSwipeRefresh.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
-            @Override
-            public void onRefresh() {
-                startScanner();
-            }
-        });
+        mSwipeRefresh.setOnRefreshListener(this::startScanner);
 
         mSwipeRefresh.setRefreshing(false);
 
@@ -130,6 +123,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         mHandler.postDelayed(mRssiRunable, 5000);
+        mHandler.postDelayed(mBattRunable, 30000);
     }
 
     @Override
@@ -137,6 +131,7 @@ public class MainActivity extends AppCompatActivity {
         super.onPause();
         stopScanner();
         mHandler.removeCallbacks(mRssiRunable);
+        mHandler.removeCallbacks(mBattRunable);
     }
 
     @Override
@@ -148,6 +143,7 @@ public class MainActivity extends AppCompatActivity {
         mBleServices.stopService();
         mLogService.stopService();
         mHandler.removeCallbacks(mRssiRunable);
+        mHandler.removeCallbacks(mBattRunable);
     }
 
     @Override
@@ -1093,19 +1089,12 @@ public class MainActivity extends AppCompatActivity {
 
                 deviceNameEdit = itemView.findViewById(R.id.ble_device_name_edit);
                 deviceNameEdit.setBackground(null);
-                deviceNameEdit.setOnEditorActionListener(new TextView.OnEditorActionListener() {
-                    @Override
-                    public boolean onEditorAction(TextView textView, int i, KeyEvent keyEvent) {
-                        if (i == EditorInfo.IME_ACTION_DONE || keyEvent.getKeyCode() == KeyEvent.KEYCODE_ENTER) {
-                            onNameClickCallback(address, textView.getText().toString());
-                            return true;
-                        } else if (i == EditorInfo.IME_FLAG_NAVIGATE_NEXT || keyEvent.getKeyCode() == KeyEvent.KEYCODE_BACK) {
-                            onNameClickCallback(address, null);
-                            return true;
-                        }
-
-                        return false;
+                deviceNameEdit.setOnEditorActionListener((textView, i, keyEvent) -> {
+                    if (i == EditorInfo.IME_ACTION_DONE || keyEvent.getKeyCode() == KeyEvent.KEYCODE_ENTER) {
+                        onNameClickCallback(address, textView.getText().toString());
+                        return true;
                     }
+                    return false;
                 });
 
                 connectionState = itemView.findViewById(R.id.connection_state_id);
@@ -1182,7 +1171,7 @@ public class MainActivity extends AppCompatActivity {
             if (device.editing) {
                 if (newName.equals(""))
                     clearFriendlyName(address);
-                else if (newName != null)
+                else
                     saveFriendlyName(address, newName);
             }
 

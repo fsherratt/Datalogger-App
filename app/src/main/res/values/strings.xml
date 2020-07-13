@@ -44,6 +44,7 @@
     <string name="gender_field_label">Gender</string>
     <string name="description_field_label">Description</string>
     <string name="title_for_save_page">Save the Data Log</string>
+    <string name="upload_button_alt_text">Save</string>
 
     <string-array name="gender_options">
         <item>Male</item>
