@@ -13,7 +13,7 @@ import android.widget.PopupWindow;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
-public class PopUpClass  {
+public class PopUpClass {
     private static final String TAG = "PopUpClass";
 
     Button mCancelButton;
@@ -24,16 +24,18 @@ public class PopUpClass  {
     TextView mTitle;
 
     Context mContext;
+    // Popup callbacks
+    popupCallbacks callback;
 
     public PopUpClass(Context context) {
         mContext = context;
 
         LayoutInflater inflater = LayoutInflater.from(mContext);
-        View popupView = inflater.inflate(R.layout.upload_popup, (ViewGroup)null);
+        View popupView = inflater.inflate(R.layout.upload_popup, null);
 
-        mProgress = (ProgressBar)popupView.findViewById(R.id.upload_progressBar);
-        mFileName = (TextView)popupView.findViewById(R.id.Filename_textview);
-        mTitle = (TextView)popupView.findViewById(R.id.titleText);
+        mProgress = popupView.findViewById(R.id.upload_progressBar);
+        mFileName = popupView.findViewById(R.id.Filename_textview);
+        mTitle = popupView.findViewById(R.id.titleText);
 
         //Specify the length and width through constants
         int width = LinearLayout.LayoutParams.MATCH_PARENT;
@@ -54,7 +56,7 @@ public class PopUpClass  {
         // Dim behind
         View container = mPopupWindow.getContentView().getRootView();
 
-        WindowManager wm = (WindowManager)mContext.getSystemService(Context.WINDOW_SERVICE);
+        WindowManager wm = (WindowManager) mContext.getSystemService(Context.WINDOW_SERVICE);
         WindowManager.LayoutParams p = (WindowManager.LayoutParams) container.getLayoutParams();
 
         p.flags |= WindowManager.LayoutParams.FLAG_DIM_BEHIND;
@@ -62,7 +64,6 @@ public class PopUpClass  {
 
         wm.updateViewLayout(container, p);
     }
-
 
     // Update UI
     public void setProgressBar(int progress) {
@@ -91,15 +92,12 @@ public class PopUpClass  {
         }
     }
 
-    // Popup callbacks
-    popupCallbacks callback;
+    public void setOnDismissCallback(popupCallbacks callback) {
+        this.callback = callback;
+    }
 
     public interface popupCallbacks {
         void onDismiss();
-    }
-
-    public void setOnDismissCallback(popupCallbacks callback) {
-        this.callback = callback;
     }
 }
 

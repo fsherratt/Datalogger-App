@@ -19,6 +19,8 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.util.Log;
 
+import androidx.annotation.Nullable;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -28,13 +30,9 @@ import java.util.UUID;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
-import androidx.annotation.Nullable;
-
 // Management of GATT devices.
 // Creation, stream enable/disable and destruction
 public class bleService extends Service {
-    private static final String TAG = "bleService";
-
     public final static String ACTION_ADD_GATT_DEVICES = "com.fsherratt.imudatalogger.ACTION_ADD_GATT_DEVICE";
     public final static String ACTION_CLOSE_GATT_DEVICES = "com.fsherratt.imudatalogger.ACTION_CLOSE_GATT_DEVICE";
     public final static String ACTION_CLOSE_GATT_ALL = "com.fsherratt.imudatalogger.ACTION_CLOSE_GATT_ALL";
@@ -45,14 +43,12 @@ public class bleService extends Service {
     public final static String ACTION_REQUEST_MTU = "com.fsherratt.imudatalogger.ACTION_REQUEST_MTU";
     public final static String ACTION_REQUEST_CONNECTION_STATUS = "com.fsherratt.imudatalogger.ACTION_REQUEST_CONNECTION_STATUS";
     public final static String ACTION_REQUEST_BATTERY_LEVEL = "com.fsherratt.imudatalogger.ACTION_REQUEST_BATTERY_LEVEL";
-
     public final static String ACTION_COMPLETE = "com.fsherratt.imudatalogger.ACTION_COMPLETE";
     public final static String ACTION_SUCCESS = "com.fsherratt.imudatalogger.ACTION_SUCCESS";
     public final static String ACTION_FAILED = "com.fsherratt.imudatalogger.ACTION_COMPLETE";
     public final static String ACTION_DATA_AVAILABLE = "com.fsherratt.imudatalogger.ACTION_DATA_AVAILABLE";
     public final static String ACTION_DEVICE_RSSI = "com.fsherratt.imudatalogger.ACTION_DEVICE_RSSI";
     public final static String ACTION_BATTERY_LEVEL = "com.fsherratt.imudatalogger.ACTION_BATTERY_LEVEL";
-
     public final static String EXTRA_ADDRESS_LIST = "com.example.fsherratt.imudatalogger.EXTRA_ADDRESS_LIST";
     public final static String EXTRA_UUID = "com.fsherratt.imudatalogger.EXTRA_UUID";
     public final static String EXTRA_DATA = "com.fsherratt.imudatalogger.EXTRA_DATA";
@@ -62,7 +58,6 @@ public class bleService extends Service {
     public final static String EXTRA_BATTERY = "com.fsherratt.imudatalogger.EXTRA_RSSI";
     public final static String EXTRA_ACTION = "com.fsherratt.imudatalogger.EXTRA_ACTION";
     public final static String EXTRA_RESULT = "com.fsherratt.imudatalogger.EXTRA_RESULT";
-
     public final static int DEVICE_STATE_ERROR = -1;
     public final static int DEVICE_STATE_DISCONNECTED = 0;
     public final static int DEVICE_STATE_INITIALISING = 1;
@@ -70,178 +65,20 @@ public class bleService extends Service {
     public final static int DEVICE_STATE_DISCOVERING = 3;
     public final static int DEVICE_STATE_CONNECTED = 4;
     public final static int DEVICE_STATE_STREAMING = 5;
-
+    private static final String TAG = "bleService";
+    private final BroadcastReceiver mActionReceiver;
+    private final BroadcastReceiver mGattUpdateReceiver;
+    private final BroadcastReceiver mConnectionReceiver;
     private BluetoothManager mBluetoothManager;
     private BluetoothAdapter mBluetoothAdapter;
-
     private HashMap<String, bleGattDevice> mConnectedDeviceMap = new HashMap<>();
-
     private Queue<BluetoothAction> actionQueue = new LinkedList<>();
     private BluetoothAction currentAction = null;
-
     private Semaphore mBleActionSemaphore = new Semaphore(1, true);
-
     private Handler mActionTimeoutHandler = new Handler();
     private Runnable mActionTimeoutRunnable = this::cancelAction;
 
-    @Nullable
-    @Override
-    public IBinder onBind(Intent intent) {
-        return null;
-    }
-
-    @Override
-    public void onCreate() {
-        super.onCreate();
-
-        if ( !initialize() ) {
-            Log.e(TAG, "onCreate: Error creating bluetooth manager");
-            return;
-        }
-
-        startReceiver();
-        startActionReceiver();
-        startConnectionReceiver();
-    }
-
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
-        // Close all BLE connections
-        for ( bleGattDevice device : mConnectedDeviceMap.values() ) {
-            device.close();
-        }
-
-        stopReceiver();
-        stopActionReceiver();
-        stopConnectionReceiver();
-
-        mActionTimeoutHandler.removeCallbacks(mActionTimeoutRunnable);
-    }
-
-
-
-    // Control device state
-    public boolean initialize() {
-        if (mBluetoothManager != null) {
-            return false;
-        }
-        mBluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
-
-        if (mBluetoothManager == null) {
-            Log.e(TAG,  "Unable to initialize BluetoothManager.");
-            return false;
-        }
-
-        mBluetoothAdapter = mBluetoothManager.getAdapter();
-
-        if (mBluetoothAdapter == null) {
-            Log.e(TAG,  "Unable to obtain a BluetoothAdapter.");
-            return false;
-        }
-
-        return true;
-    }
-
-    public boolean connect(String deviceAddress) {
-        if (mBluetoothAdapter == null || deviceAddress == null) {
-            Log.w(TAG,  "connect: BluetoothAdapter not initialized or unspecified address.");
-            return false;
-        }
-
-        if (mConnectedDeviceMap.containsKey(deviceAddress)) {
-            Log.w(TAG, "connect: Device " + deviceAddress + " already connected");
-            return false;
-        }
-
-        final BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(deviceAddress);
-
-        if (device == null) {
-            Log.w(TAG,  "connect: Device not found.  Unable to connect.");
-            return false;
-        }
-
-        Log.d(TAG,  "connect: Found device");
-
-        mConnectedDeviceMap.put(deviceAddress, new bleGattDevice(this, device));
-
-        return true;
-    }
-
-    public void disconnect(String deviceAddress) {
-        bleGattDevice device = mConnectedDeviceMap.get(deviceAddress);
-
-        if (device == null) {
-            return;
-        }
-
-        device.close();
-    }
-
-    public void enableStream(String deviceAddress, boolean enable) {
-        bleGattDevice device = mConnectedDeviceMap.get(deviceAddress);
-
-        if (device == null) {
-            return;
-        }
-
-        device.setStream(enable);
-    }
-
-    public boolean requestRssi(String deviceAddress) {
-        bleGattDevice device = mConnectedDeviceMap.get(deviceAddress);
-
-        if (device == null) {
-            return false;
-        }
-
-        return device.readRssi();
-    }
-
-    public boolean requestMTU(String deviceAddress) {
-        bleGattDevice device = mConnectedDeviceMap.get(deviceAddress);
-
-        if (device == null) {
-            return false;
-        }
-
-        int size = 300;
-
-        return device.requestMtu(size);
-    }
-
-    public boolean requestBattery(String deviceAddress) {
-        bleGattDevice device = mConnectedDeviceMap.get(deviceAddress);
-
-        if (device == null) {
-            return false;
-        }
-
-        return device.requestBatteryLevel();
-    }
-
-
-    // Device connection state callbacks
-    private void startActionReceiver() {
-        final IntentFilter intentFilter = new IntentFilter();
-        intentFilter.addAction(ACTION_COMPLETE);
-
-        try {
-            registerReceiver(mActionReceiver, intentFilter);
-        } catch (IllegalArgumentException e) {
-            Log.e(TAG, "Receiver already registered");
-        }
-    }
-
-    private void stopActionReceiver() {
-        try {
-            unregisterReceiver(mActionReceiver);
-        } catch(IllegalArgumentException e) {
-            Log.e(TAG, "Receiver not registered");
-        }
-    }
-
-    private final BroadcastReceiver mActionReceiver; {
+    {
         mActionReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
@@ -249,16 +86,16 @@ public class bleService extends Service {
                 final String action = intent.getStringExtra(EXTRA_ACTION);
                 final String result = intent.getStringExtra(EXTRA_RESULT);
 
-                if ( currentAction == null)
+                if (currentAction == null)
                     return;
 
                 assert address != null;
-                if ( !address.equals(currentAction.mdevice))
+                if (!address.equals(currentAction.mdevice))
                     return;
 
                 Log.d(TAG, "ActionReciever: Device: " + address + " Action: " + action + " Result: " + result);
 
-                if ( !currentAction.mExpectedOutcome.equals(result) )
+                if (!currentAction.mExpectedOutcome.equals(result))
                     return;
 
                 mActionTimeoutHandler.removeCallbacks(mActionTimeoutRunnable);
@@ -269,102 +106,7 @@ public class bleService extends Service {
         };
     }
 
-    public void nextAction() {
-        if ( actionQueue.size() == 0 )
-        {
-            return;
-        }
-
-        if ( !mBleActionSemaphore.tryAcquire() ) {
-            return;
-        }
-
-        BluetoothAction newAction = actionQueue.remove();
-
-        boolean success = false;
-
-        switch( newAction.mAction) {
-            case ACTION_ADD_GATT_DEVICES:
-                success = connect(newAction.mdevice);
-                break;
-
-            case ACTION_REQUEST_RSSI:
-                success = requestRssi(newAction.mdevice);
-                break;
-
-            case ACTION_REQUEST_MTU:
-                success = requestMTU(newAction.mdevice);
-                break;
-
-            case ACTION_REQUEST_BATTERY_LEVEL:
-                success = requestBattery(newAction.mdevice);
-                break;
-
-            default:
-                break;
-        }
-
-        if (!success) {
-            mBleActionSemaphore.release();
-            currentAction = null;
-
-            nextAction();
-            return;
-        }
-
-        currentAction = newAction;
-        mActionTimeoutHandler.postDelayed(mActionTimeoutRunnable, 5000);
-    }
-
-    public void cancelAction() {
-        if ( currentAction == null ) {
-            return;
-        }
-
-        bleGattDevice device = mConnectedDeviceMap.get(currentAction.mdevice);
-
-        if (device != null) {
-            device.setConnectionState(DEVICE_STATE_ERROR);
-            device.close();
-
-            mConnectedDeviceMap.remove(currentAction.mdevice);
-        }
-
-        mBleActionSemaphore.release();
-        currentAction = null;
-
-        nextAction();
-    }
-
-
-    // Broadcast receiver for instructions from UI
-    private void startReceiver() {
-        final IntentFilter intentFilter = new IntentFilter();
-        intentFilter.addAction(ACTION_ADD_GATT_DEVICES);
-        intentFilter.addAction(ACTION_CLOSE_GATT_DEVICES);
-        intentFilter.addAction(ACTION_CLOSE_GATT_ALL);
-        intentFilter.addAction(ACTION_START_STREAM_DEVICES);
-        intentFilter.addAction(ACTION_STOP_STREAM_DEVICES);
-        intentFilter.addAction(ACTION_REQUEST_RSSI);
-        intentFilter.addAction(ACTION_REQUEST_CONNECTION_STATUS);
-        intentFilter.addAction(ACTION_REQUEST_BATTERY_LEVEL);
-
-        try {
-            registerReceiver(mGattUpdateReceiver, intentFilter);
-        } catch(IllegalArgumentException e) {
-            Log.e(TAG, "Receiver already registered");
-        }
-    }
-
-    private void stopReceiver() {
-        try {
-            unregisterReceiver(mGattUpdateReceiver);
-        } catch(IllegalArgumentException e) {
-            Log.e(TAG, "Receiver not registered");
-        }
-    }
-
-    private final BroadcastReceiver mGattUpdateReceiver; {
+    {
         mGattUpdateReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
@@ -456,40 +198,7 @@ public class bleService extends Service {
         };
     }
 
-    static class BluetoothAction {
-        String mAction;
-        String mdevice;
-        String mExpectedOutcome;
-
-        BluetoothAction(String action, String device, String expectedOutcome ) {
-            this.mAction = action;
-            this.mdevice = device;
-            this.mExpectedOutcome = expectedOutcome;
-        }
-    }
-
-
-    // Broadcast reciever for device connection state
-    private void startConnectionReceiver() {
-        final IntentFilter intentFilter = new IntentFilter();
-        intentFilter.addAction(ACTION_GATT_STATE_CHANGED);
-
-        try {
-            registerReceiver(mConnectionReceiver, intentFilter);
-        } catch (IllegalArgumentException e) {
-            Log.e(TAG, "Receiver already registered");
-        }
-    }
-
-    private void stopConnectionReceiver() {
-        try {
-            unregisterReceiver(mConnectionReceiver);
-        } catch(IllegalArgumentException e) {
-            Log.e(TAG, "Receiver not registered");
-        }
-    }
-
-    private final BroadcastReceiver mConnectionReceiver; {
+    {
         mConnectionReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
@@ -507,7 +216,7 @@ public class bleService extends Service {
                     } else if (state == DEVICE_STATE_ERROR) {
                         bleGattDevice device = mConnectedDeviceMap.get(address);
 
-                        if ( device == null ) {
+                        if (device == null) {
                             return;
                         }
 
@@ -519,17 +228,293 @@ public class bleService extends Service {
         };
     }
 
+    @Nullable
+    @Override
+    public IBinder onBind(Intent intent) {
+        return null;
+    }
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+
+        if (!initialize()) {
+            Log.e(TAG, "onCreate: Error creating bluetooth manager");
+            return;
+        }
+
+        startReceiver();
+        startActionReceiver();
+        startConnectionReceiver();
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        // Close all BLE connections
+        for (bleGattDevice device : mConnectedDeviceMap.values()) {
+            device.close();
+        }
+
+        stopReceiver();
+        stopActionReceiver();
+        stopConnectionReceiver();
+
+        mActionTimeoutHandler.removeCallbacks(mActionTimeoutRunnable);
+    }
+
+    // Control device state
+    public boolean initialize() {
+        if (mBluetoothManager != null) {
+            return false;
+        }
+        mBluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
+
+        if (mBluetoothManager == null) {
+            Log.e(TAG, "Unable to initialize BluetoothManager.");
+            return false;
+        }
+
+        mBluetoothAdapter = mBluetoothManager.getAdapter();
+
+        if (mBluetoothAdapter == null) {
+            Log.e(TAG, "Unable to obtain a BluetoothAdapter.");
+            return false;
+        }
+
+        return true;
+    }
+
+    public boolean connect(String deviceAddress) {
+        if (mBluetoothAdapter == null || deviceAddress == null) {
+            Log.w(TAG, "connect: BluetoothAdapter not initialized or unspecified address.");
+            return false;
+        }
+
+        if (mConnectedDeviceMap.containsKey(deviceAddress)) {
+            Log.w(TAG, "connect: Device " + deviceAddress + " already connected");
+            return false;
+        }
+
+        final BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(deviceAddress);
+
+        if (device == null) {
+            Log.w(TAG, "connect: Device not found.  Unable to connect.");
+            return false;
+        }
+
+        Log.d(TAG, "connect: Found device");
+
+        mConnectedDeviceMap.put(deviceAddress, new bleGattDevice(this, device));
+
+        return true;
+    }
+
+    public void disconnect(String deviceAddress) {
+        bleGattDevice device = mConnectedDeviceMap.get(deviceAddress);
+
+        if (device == null) {
+            return;
+        }
+
+        device.close();
+    }
+
+    public void enableStream(String deviceAddress, boolean enable) {
+        bleGattDevice device = mConnectedDeviceMap.get(deviceAddress);
+
+        if (device == null) {
+            return;
+        }
+
+        device.setStream(enable);
+    }
+
+    public boolean requestRssi(String deviceAddress) {
+        bleGattDevice device = mConnectedDeviceMap.get(deviceAddress);
+
+        if (device == null) {
+            return false;
+        }
+
+        return device.readRssi();
+    }
+
+    public boolean requestMTU(String deviceAddress) {
+        bleGattDevice device = mConnectedDeviceMap.get(deviceAddress);
+
+        if (device == null) {
+            return false;
+        }
+
+        int size = 300;
+
+        return device.requestMtu(size);
+    }
+
+    public boolean requestBattery(String deviceAddress) {
+        bleGattDevice device = mConnectedDeviceMap.get(deviceAddress);
+
+        if (device == null) {
+            return false;
+        }
+
+        return device.requestBatteryLevel();
+    }
+
+    // Device connection state callbacks
+    private void startActionReceiver() {
+        final IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(ACTION_COMPLETE);
+
+        try {
+            registerReceiver(mActionReceiver, intentFilter);
+        } catch (IllegalArgumentException e) {
+            Log.e(TAG, "Receiver already registered");
+        }
+    }
+
+    private void stopActionReceiver() {
+        try {
+            unregisterReceiver(mActionReceiver);
+        } catch (IllegalArgumentException e) {
+            Log.e(TAG, "Receiver not registered");
+        }
+    }
+
+    public void nextAction() {
+        if (actionQueue.size() == 0) {
+            return;
+        }
+
+        if (!mBleActionSemaphore.tryAcquire()) {
+            return;
+        }
+
+        BluetoothAction newAction = actionQueue.remove();
+
+        boolean success = false;
+
+        switch (newAction.mAction) {
+            case ACTION_ADD_GATT_DEVICES:
+                success = connect(newAction.mdevice);
+                break;
+
+            case ACTION_REQUEST_RSSI:
+                success = requestRssi(newAction.mdevice);
+                break;
+
+            case ACTION_REQUEST_MTU:
+                success = requestMTU(newAction.mdevice);
+                break;
+
+            case ACTION_REQUEST_BATTERY_LEVEL:
+                success = requestBattery(newAction.mdevice);
+                break;
+
+            default:
+                break;
+        }
+
+        if (!success) {
+            mBleActionSemaphore.release();
+            currentAction = null;
+
+            nextAction();
+            return;
+        }
+
+        currentAction = newAction;
+        mActionTimeoutHandler.postDelayed(mActionTimeoutRunnable, 5000);
+    }
+
+    public void cancelAction() {
+        if (currentAction == null) {
+            return;
+        }
+
+        bleGattDevice device = mConnectedDeviceMap.get(currentAction.mdevice);
+
+        if (device != null) {
+            device.setConnectionState(DEVICE_STATE_ERROR);
+            device.close();
+
+            mConnectedDeviceMap.remove(currentAction.mdevice);
+        }
+
+        mBleActionSemaphore.release();
+        currentAction = null;
+
+        nextAction();
+    }
+
+    // Broadcast receiver for instructions from UI
+    private void startReceiver() {
+        final IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(ACTION_ADD_GATT_DEVICES);
+        intentFilter.addAction(ACTION_CLOSE_GATT_DEVICES);
+        intentFilter.addAction(ACTION_CLOSE_GATT_ALL);
+        intentFilter.addAction(ACTION_START_STREAM_DEVICES);
+        intentFilter.addAction(ACTION_STOP_STREAM_DEVICES);
+        intentFilter.addAction(ACTION_REQUEST_RSSI);
+        intentFilter.addAction(ACTION_REQUEST_CONNECTION_STATUS);
+        intentFilter.addAction(ACTION_REQUEST_BATTERY_LEVEL);
+
+        try {
+            registerReceiver(mGattUpdateReceiver, intentFilter);
+        } catch (IllegalArgumentException e) {
+            Log.e(TAG, "Receiver already registered");
+        }
+    }
+
+    private void stopReceiver() {
+        try {
+            unregisterReceiver(mGattUpdateReceiver);
+        } catch (IllegalArgumentException e) {
+            Log.e(TAG, "Receiver not registered");
+        }
+    }
+
+    // Broadcast reciever for device connection state
+    private void startConnectionReceiver() {
+        final IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(ACTION_GATT_STATE_CHANGED);
+
+        try {
+            registerReceiver(mConnectionReceiver, intentFilter);
+        } catch (IllegalArgumentException e) {
+            Log.e(TAG, "Receiver already registered");
+        }
+    }
+
+    private void stopConnectionReceiver() {
+        try {
+            unregisterReceiver(mConnectionReceiver);
+        } catch (IllegalArgumentException e) {
+            Log.e(TAG, "Receiver not registered");
+        }
+    }
+
+    static class BluetoothAction {
+        String mAction;
+        String mdevice;
+        String mExpectedOutcome;
+
+        BluetoothAction(String action, String device, String expectedOutcome) {
+            this.mAction = action;
+            this.mdevice = device;
+            this.mExpectedOutcome = expectedOutcome;
+        }
+    }
 
     // Bluetooth GATT Connection class
     static class bleGattDevice {
-        private String TAG;
-
         final UUID streamServiceUUID = UUID.fromString("8f68223d-01df-3097-2e45-01a046aada78");
         final UUID streamChar1UUID = UUID.fromString("00000001-0000-1000-8000-00805f9b34fb");
         final UUID batteryServiceUUID = UUID.fromString("180F-0000-1000-8000-00805f9b34fb");
         final UUID batteryCharacteristicUUID = UUID.fromString("2A19-0000-1000-8000-00805f9b34fb");
         final UUID clientCharacterisitcConfig = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
-
+        private String TAG;
         private Context mContext;
         private int mConnectionState;
 
@@ -540,7 +525,7 @@ public class bleService extends Service {
         private Semaphore mCharWriteSemaphore = new Semaphore(1, true);
 
 
-        bleGattDevice( Context context, BluetoothDevice device ) {
+        bleGattDevice(Context context, BluetoothDevice device) {
             TAG = "BluetoothGattDevice-" + device.getAddress();
 
             mContext = context;
@@ -556,8 +541,7 @@ public class bleService extends Service {
             mConnectionState = bleService.DEVICE_STATE_CONNECTING;
             mDeviceGatt = mBluetoothDevice.connectGatt(mContext, false, mGattCallback);
 
-            if (mDeviceGatt == null)
-            {
+            if (mDeviceGatt == null) {
                 setConnectionState(DEVICE_STATE_ERROR);
                 return;
             }
@@ -566,8 +550,7 @@ public class bleService extends Service {
         }
 
         void close() {
-            if ( mDeviceGatt == null )
-            {
+            if (mDeviceGatt == null) {
                 setConnectionState(DEVICE_STATE_ERROR);
                 return;
             }
@@ -575,8 +558,8 @@ public class bleService extends Service {
             mDeviceGatt.disconnect();
         }
 
-        void setStream( boolean enable ) {
-            if ( mConnectionState != DEVICE_STATE_CONNECTED && mConnectionState != DEVICE_STATE_STREAMING )
+        void setStream(boolean enable) {
+            if (mConnectionState != DEVICE_STATE_CONNECTED && mConnectionState != DEVICE_STATE_STREAMING)
                 return;
 
             final BluetoothGattService streamService = mDeviceGatt.getService(streamServiceUUID);
@@ -605,12 +588,12 @@ public class bleService extends Service {
             return mDeviceGatt.readRemoteRssi();
         }
 
-        boolean requestMtu( int size ) {
+        boolean requestMtu(int size) {
             return mDeviceGatt.requestMtu(size);
         }
 
         boolean requestBatteryLevel() {
-            if ( mConnectionState != DEVICE_STATE_CONNECTED && mConnectionState != DEVICE_STATE_STREAMING )
+            if (mConnectionState != DEVICE_STATE_CONNECTED && mConnectionState != DEVICE_STATE_STREAMING)
                 return false;
 
             final BluetoothGattService streamService = mDeviceGatt.getService(batteryServiceUUID);
@@ -641,13 +624,13 @@ public class bleService extends Service {
         }
 
 
-        private void setConnectionState( int newState ) {
+        private void setConnectionState(int newState) {
             mConnectionState = newState;
             requestConnectionState();
         }
 
 
-        private void setRssiState( int rssi ) {
+        private void setRssiState(int rssi) {
             final Intent intent = new Intent(bleService.ACTION_DEVICE_RSSI);
             intent.putExtra(MainActivity.EXTRA_ADDRESS, mBluetoothDevice.getAddress());
             intent.putExtra(bleService.EXTRA_RSSI, rssi);
@@ -659,12 +642,12 @@ public class bleService extends Service {
         private void setBatteryLevel(byte batteryLevel) {
             final Intent intent = new Intent(bleService.ACTION_BATTERY_LEVEL);
             intent.putExtra(MainActivity.EXTRA_ADDRESS, mBluetoothDevice.getAddress());
-            intent.putExtra(bleService.EXTRA_BATTERY, (int)batteryLevel);
+            intent.putExtra(bleService.EXTRA_BATTERY, (int) batteryLevel);
 
             mContext.sendBroadcast(intent);
         }
 
-        private void setNewData( byte[] data, String uuid ) {
+        private void setNewData(byte[] data, String uuid) {
             final Intent intent = new Intent(bleService.ACTION_DATA_AVAILABLE);
             intent.putExtra(MainActivity.EXTRA_ADDRESS, mBluetoothDevice.getAddress());
             intent.putExtra(bleService.EXTRA_UUID, uuid);
@@ -674,7 +657,7 @@ public class bleService extends Service {
             mContext.sendBroadcast(intent);
         }
 
-        private void actionComplete( String action, String result ) {
+        private void actionComplete(String action, String result) {
             final Intent intent = new Intent(bleService.ACTION_COMPLETE);
             intent.putExtra(MainActivity.EXTRA_ADDRESS, mBluetoothDevice.getAddress());
             intent.putExtra(bleService.EXTRA_ACTION, action);
@@ -683,17 +666,49 @@ public class bleService extends Service {
             mContext.sendBroadcast(intent);
         }
 
+        private void setCharacteristicNotification(BluetoothGattCharacteristic characteristic, boolean enabled) {
+            if (mDeviceGatt == null) {
+                return;
+            }
+
+            // Request write lock
+            try {
+                mCharWriteSemaphore.tryAcquire(1000, TimeUnit.MILLISECONDS);
+            } catch (InterruptedException e) {
+                Log.e(TAG, Objects.requireNonNull(e.getMessage()));
+                return;
+            }
+
+            BluetoothGattDescriptor descriptor = characteristic.getDescriptor(clientCharacterisitcConfig);
+
+            if (descriptor == null) {
+                return;
+            }
+
+            // Enable on android
+            mDeviceGatt.setCharacteristicNotification(characteristic, enabled);
+
+            if (enabled) {
+                descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
+            } else {
+                descriptor.setValue(BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE);
+            }
+
+            // Enable on device
+//            descriptorUpdateUUID = characteristic.getUuid().toString();
+            mDeviceGatt.writeDescriptor(descriptor);
+        }
 
         class gattCallback extends BluetoothGattCallback {
             @Override
             public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
-                if ( newState == BluetoothProfile.STATE_CONNECTED ) {
+                if (newState == BluetoothProfile.STATE_CONNECTED) {
                     gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH);
 
                     gatt.discoverServices();
                     setConnectionState(DEVICE_STATE_DISCOVERING);
 
-                } else if ( newState == BluetoothProfile.STATE_DISCONNECTED ) {
+                } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                     setConnectionState(DEVICE_STATE_DISCONNECTED);
                     gatt.close();
                 } else {
@@ -741,7 +756,7 @@ public class bleService extends Service {
                 super.onCharacteristicRead(gatt, characteristic, status);
 
                 if (status == BluetoothGatt.GATT_SUCCESS) {
-                    if ( characteristic.getUuid().equals(batteryCharacteristicUUID) ) {
+                    if (characteristic.getUuid().equals(batteryCharacteristicUUID)) {
                         actionComplete(ACTION_REQUEST_BATTERY_LEVEL, ACTION_SUCCESS);
                         byte batteryLevel = characteristic.getValue()[0];
                         setBatteryLevel(batteryLevel);
@@ -757,11 +772,10 @@ public class bleService extends Service {
 
                 if (status == BluetoothGatt.GATT_SUCCESS) {
 
-                    if ( descriptor.getValue() == BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE ) {
+                    if (descriptor.getValue() == BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE) {
                         setConnectionState(DEVICE_STATE_STREAMING);
 //                        setStreamStatus(descriptorUpdateUUID, true );
-                    }
-                    else if ( descriptor.getValue() == BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE ) {
+                    } else if (descriptor.getValue() == BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE) {
                         setConnectionState(DEVICE_STATE_CONNECTED);
 //                        setStreamStatus(descriptorUpdateUUID, false );
                     }
@@ -779,39 +793,6 @@ public class bleService extends Service {
 
                 setNewData(characteristic.getValue(), characteristic.getUuid().toString());
             }
-        }
-
-        private void setCharacteristicNotification(BluetoothGattCharacteristic characteristic, boolean enabled) {
-            if (mDeviceGatt == null) {
-                return;
-            }
-
-            // Request write lock
-            try {
-                mCharWriteSemaphore.tryAcquire(1000, TimeUnit.MILLISECONDS);
-            } catch ( InterruptedException e ) {
-                Log.e(TAG, Objects.requireNonNull(e.getMessage()));
-                return;
-            }
-
-            BluetoothGattDescriptor descriptor = characteristic.getDescriptor( clientCharacterisitcConfig );
-
-            if (descriptor == null) {
-                return;
-            }
-
-            // Enable on android
-            mDeviceGatt.setCharacteristicNotification(characteristic, enabled);
-
-            if (enabled) {
-                descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
-            } else {
-                descriptor.setValue(BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE);
-            }
-
-            // Enable on device
-//            descriptorUpdateUUID = characteristic.getUuid().toString();
-            mDeviceGatt.writeDescriptor(descriptor);
         }
     }
 }

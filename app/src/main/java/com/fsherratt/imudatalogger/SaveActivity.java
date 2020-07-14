@@ -1,8 +1,5 @@
 package com.fsherratt.imudatalogger;
 
-import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
-
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -14,6 +11,9 @@ import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
+
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.snackbar.Snackbar;
 import com.google.firebase.auth.FirebaseAuth;
@@ -31,16 +31,24 @@ import java.util.Arrays;
 import java.util.Objects;
 
 public class SaveActivity extends AppCompatActivity {
-    private static final String TAG = "SaveActivity";
-
     final static String EXTRA_FILENAME = "com.example.fsherratt.imudatalogger.EXTRA_FILENAME";
-
+    private static final String TAG = "SaveActivity";
+    // Firebase Authorization
+    FirebaseAuth mAuth;
+    FirebaseUser mCurrentUser = null;
+    // File Operations
+    ArrayList<File> mfileList = null;
+    // Firebase Storage
+    FirebaseStorage mStorage = null;
+    UploadTask mUploadTask = null;
+    Boolean mUploadSuccess = false;
     private String mfileName;
-
     private EditText mDescription;
     private EditText mHeight;
     private AutoCompleteTextView mGender;
     private Button mUpload;
+    // UI Uploading Popup
+    private PopUpClass mPopUpWindow;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -50,10 +58,10 @@ public class SaveActivity extends AppCompatActivity {
         Intent intent = getIntent();
         mfileName = intent.getStringExtra(EXTRA_FILENAME);
 
-        mDescription = (EditText)findViewById(R.id.Description_Input);
-        mHeight = (EditText)findViewById(R.id.height_input);
-        mGender = (AutoCompleteTextView) findViewById(R.id.gender_spinner);
-        mUpload = (Button)findViewById(R.id.upload_button);
+        mDescription = findViewById(R.id.Description_Input);
+        mHeight = findViewById(R.id.height_input);
+        mGender = findViewById(R.id.gender_spinner);
+        mUpload = findViewById(R.id.upload_button);
 
         final ArrayList<String> genderList = new ArrayList<>(Arrays.asList(getResources().getStringArray(R.array.gender_options)));
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this, R.layout.list_item, genderList);
@@ -72,7 +80,6 @@ public class SaveActivity extends AppCompatActivity {
         loginToFireBase();
     }
 
-
     // UI Activity
     public void upload_button(View view) {
         saveMetaData();
@@ -87,8 +94,6 @@ public class SaveActivity extends AppCompatActivity {
         finish();
     }
 
-    // UI Uploading Popup
-    private PopUpClass mPopUpWindow;
     private void createPopup(View view) {
         if (mCurrentUser == null) {
             return;
@@ -137,11 +142,6 @@ public class SaveActivity extends AppCompatActivity {
         mPopUpWindow.setTitle(title);
     }
 
-
-    // Firebase Authorization
-    FirebaseAuth mAuth;
-    FirebaseUser mCurrentUser = null;
-
     private void loginToFireBase() {
         // Check if we are already logged in
         mCurrentUser = mAuth.getCurrentUser();
@@ -183,23 +183,20 @@ public class SaveActivity extends AppCompatActivity {
         mUpload.setEnabled(true);
     }
 
-
-    // File Operations
-    ArrayList<File> mfileList = null;
     private void getFiles() {
         String logDir = getResources().getString(R.string.log_directory);
         String path = Environment.getExternalStorageDirectory().toString() + File.separator + logDir;
         File dir = new File(path);
 
         FileFilter filter = pathname -> pathname.getName().contains(mfileName);
-        mfileList = new ArrayList<>( Arrays.asList(Objects.requireNonNull(dir.listFiles(filter))) );
+        mfileList = new ArrayList<>(Arrays.asList(Objects.requireNonNull(dir.listFiles(filter))));
     }
 
     private void saveMetaData() {
         String metaFileName = mfileName + "_meta.txt";
 
         String file = "file: " + mfileName + System.getProperty("line.separator");
-        String gender =  "gender: " + mGender.getText().toString() + System.getProperty("line.separator");
+        String gender = "gender: " + mGender.getText().toString() + System.getProperty("line.separator");
         String height = "height: " + mHeight.getText().toString() + System.getProperty("line.separator");
         String description = "description: " + mDescription.getText().toString() + System.getProperty("line.separator");
 
@@ -218,19 +215,13 @@ public class SaveActivity extends AppCompatActivity {
             fileStream.flush();
 
             fileStream.close();
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             Log.e("Exception", "File write failed: " + e.toString());
         }
 
         getFiles();
     }
 
-
-    // Firebase Storage
-    FirebaseStorage mStorage = null;
-    UploadTask mUploadTask = null;
-    Boolean mUploadSuccess = false;
     private void setupStorage() {
         String customApp = "gs://gaitdatalogger.appspot.com";
         mStorage = FirebaseStorage.getInstance(customApp);
@@ -256,7 +247,7 @@ public class SaveActivity extends AppCompatActivity {
             return;
         }
 
-        if (mUploadTask != null ) {
+        if (mUploadTask != null) {
             return;
         }
 
@@ -285,7 +276,7 @@ public class SaveActivity extends AppCompatActivity {
         Uri fileUri = Uri.fromFile(file);
 
         StorageReference storageReference = mStorage.getReference(mfileName + "/" + fileUri.getLastPathSegment());
-        storageReference.getStorage().setMaxUploadRetryTimeMillis(1000*60); // Timeout after 1 minutes
+        storageReference.getStorage().setMaxUploadRetryTimeMillis(1000 * 60); // Timeout after 1 minutes
         setFileName(fileUri.getLastPathSegment());
 
         mUploadTask = storageReference.putFile(fileUri);
@@ -316,7 +307,7 @@ public class SaveActivity extends AppCompatActivity {
     }
 
     private void fileProgressListener(UploadTask.TaskSnapshot taskSnapshot) {
-        int progress = (int)((100.0 * taskSnapshot.getBytesTransferred()) / taskSnapshot.getTotalByteCount());
+        int progress = (int) ((100.0 * taskSnapshot.getBytesTransferred()) / taskSnapshot.getTotalByteCount());
         setProgressBar(progress);
     }
 }

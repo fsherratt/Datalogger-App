@@ -32,7 +32,8 @@
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/device_recycler_view"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content" />
+                android:layout_height="wrap_content"
+                android:contentDescription="@string/device_list_content_description" />
         </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
     </androidx.constraintlayout.widget.ConstraintLayout>
 

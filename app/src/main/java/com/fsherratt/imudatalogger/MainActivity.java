@@ -10,12 +10,8 @@ import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.location.LocationManager;
-import android.os.Handler;
-
-import androidx.annotation.NonNull;
-import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
 import android.os.Bundle;
+import android.os.Handler;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.ContextMenu;
@@ -33,13 +29,9 @@ import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
 
-import com.google.android.material.snackbar.Snackbar;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
 import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.core.app.ActivityCompat;
@@ -48,30 +40,107 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
+import com.google.android.material.snackbar.Snackbar;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+
 import no.nordicsemi.android.support.v18.scanner.BluetoothLeScannerCompat;
-import no.nordicsemi.android.support.v18.scanner.ScanSettings;
-import no.nordicsemi.android.support.v18.scanner.ScanFilter;
 import no.nordicsemi.android.support.v18.scanner.ScanCallback;
+import no.nordicsemi.android.support.v18.scanner.ScanFilter;
 import no.nordicsemi.android.support.v18.scanner.ScanResult;
+import no.nordicsemi.android.support.v18.scanner.ScanSettings;
 
 
 public class MainActivity extends AppCompatActivity {
-    private static final String TAG = "MainActivity";
-
     public final static String EXTRA_ADDRESS = "com.example.fsherratt.imudatalogger.EXTRA_ADDRESS";
+    private static final String TAG = "MainActivity";
+    private final BroadcastReceiver mGattUpdateReceiver;
 
     private Menu mMenu;
     private Button mRecord;
-
     private Handler mHandler;
     private Runnable mRssiRunable;
     private Runnable mBattRunable;
-
     private BleServiceHolder mBleServices;
     private logServiceHolder mLogService;
     private recyclerViewHolder mRecyclerHolder;
-
     private SwipeRefreshLayout mSwipeRefresh;
+    private Button lastClicked = null;
+
+    // Recording
+    boolean recording = false;
+    String mRecordingFileName = "Unknown";
+
+    // BLE Devices
+    private HashMap<String, BleDevices> mDevices = new HashMap<>();
+
+    // BLE Scanning
+    private boolean mScanning;
+
+    private ScanCallback mScanCallback = new ScanCallback() {
+        @Override
+        public void onBatchScanResults(final List<ScanResult> results) {
+            BluetoothDevice device;
+
+            ArrayList<String> selectList = new ArrayList<>();
+            for (final ScanResult result : results) {
+                device = result.getDevice();
+                String name = device.getName();
+
+                if (name == null)
+                    continue;
+
+                if (!device.getName().toUpperCase().contains("MOVESENSE"))
+                    continue;
+
+                if (mDevices.containsKey(device.getAddress()))
+                    continue;
+
+                BleDevices deviceHolder = new BleDevices(device);
+
+                String friendlyName = getFriendlyName(device.getAddress());
+                if (friendlyName != null)
+                    deviceHolder.setFriendlyName(friendlyName);
+
+                mDevices.put(device.getAddress(), deviceHolder);
+                mRecyclerHolder.addDevice(deviceHolder);
+
+                selectList.add(device.getAddress());
+
+                Log.d(TAG, "onBatchScanResults: Added device: " + device.getName() + " " + device.getAddress());
+            }
+
+            mBleServices.connect(selectList);
+            mBleServices.requestBatteryLevel(selectList);
+        }
+
+        @Override
+        public void onScanFailed(final int errorCode) {
+            // empty
+        }
+    };
+    private Runnable mScanTimeout = this::stopScanner;
+
+    {
+        mGattUpdateReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                final String action = intent.getAction();
+
+                if (action == null)
+                    return;
+
+                if (action.equals(logService.ACTION_SAVE_FILE_NAME)) {
+                    updateFileName(intent.getStringExtra(logService.EXTRA_FILE_NAME));
+                } else {
+                    updateBluetoothDevice(action, intent);
+                }
+            }
+        };
+    }
 
     // Lifecycle code
     @Override
@@ -177,7 +246,7 @@ public class MainActivity extends AppCompatActivity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
 
         switch (permissions[0]) {
-            case  Manifest.permission.ACCESS_FINE_LOCATION:
+            case Manifest.permission.ACCESS_FINE_LOCATION:
                 Log.d(TAG, "Location permission granted");
                 startScanner();
                 break;
@@ -204,8 +273,7 @@ public class MainActivity extends AppCompatActivity {
         if (device == null)
             return;
 
-        device.setSelected( !device.itemExpanded );
-//        updateActionBar();
+        device.setSelected(!device.itemExpanded);
     }
 
     public void action_label_button(View view) {
@@ -245,8 +313,6 @@ public class MainActivity extends AppCompatActivity {
         mLogService.keyframe(action);
     }
 
-    private Button lastClicked = null;
-
     private void clearButtonHighlight() {
         if (lastClicked != null) {
             lastClicked.setTextColor(getColor(R.color.colorBlack));
@@ -265,10 +331,7 @@ public class MainActivity extends AppCompatActivity {
 
         clickedButton.setTextColor(getColor(R.color.colorWhite));
         clickedButton.setBackgroundColor(getColor(R.color.colorAccent));
-
-
     }
-
 
     // Recycler View
     public void initRecyclerView() {
@@ -283,10 +346,6 @@ public class MainActivity extends AppCompatActivity {
 
         registerForContextMenu(findViewById(R.id.main_constrainedLayout));
     }
-
-    // BLE Devices
-    private HashMap<String, BleDevices> mDevices = new HashMap<>();
-
 
     // BLE Device updates
     private void startReceiver() {
@@ -312,24 +371,6 @@ public class MainActivity extends AppCompatActivity {
         } catch (IllegalArgumentException e) {
             Log.e(TAG, "Receiver not registered");
         }
-    }
-
-    private final BroadcastReceiver mGattUpdateReceiver; {
-        mGattUpdateReceiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                final String action = intent.getAction();
-
-                if (action == null)
-                    return;
-
-                if (action.equals(logService.ACTION_SAVE_FILE_NAME)) {
-                    updateFileName(intent.getStringExtra(logService.EXTRA_FILE_NAME));
-                } else {
-                    updateBluetoothDevice(action, intent);
-                }
-            }
-        };
     }
 
     private void updateBluetoothDevice(String action, Intent intent) {
@@ -365,8 +406,8 @@ public class MainActivity extends AppCompatActivity {
                 int err = intent.getIntExtra(logService.EXTRA_ERROR, 0);
 
                 if (err == logService.FREQ_ERROR_NO_UPDATE) {
-                    BleDevices bleDevice =  mDevices.get(address);
-                    if (bleDevice == null ) {
+                    BleDevices bleDevice = mDevices.get(address);
+                    if (bleDevice == null) {
                         return;
                     }
 
@@ -389,11 +430,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-
-    // BLE Scanning
-    private boolean mScanning;
-    private Runnable mScanTimeout = this::stopScanner;
-
     public void toggleScanner() {
         if (!mScanning) {
             startScanner();
@@ -408,11 +444,10 @@ public class MainActivity extends AppCompatActivity {
 
         if (PackageManager.PERMISSION_DENIED == ContextCompat.checkSelfPermission(
                 MainActivity.this,
-                Manifest.permission.ACCESS_FINE_LOCATION))
-        {
+                Manifest.permission.ACCESS_FINE_LOCATION)) {
             Log.d(TAG, "startScanner: Permission denied");
             ActivityCompat.requestPermissions(MainActivity.this,
-                    new String[] {Manifest.permission.ACCESS_FINE_LOCATION},
+                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
                     100);
         }
 
@@ -502,56 +537,8 @@ public class MainActivity extends AppCompatActivity {
         return true;
     }
 
-    private ScanCallback mScanCallback = new ScanCallback() {
-        @Override
-        public void onBatchScanResults(final List<ScanResult> results) {
-            BluetoothDevice device;
-
-            ArrayList<String> selectList = new ArrayList<>();
-            for (final ScanResult result : results) {
-                device = result.getDevice();
-                String name = device.getName();
-
-                if (name == null)
-                    continue;
-
-                if (!device.getName().toUpperCase().contains("MOVESENSE"))
-                    continue;
-
-                if (mDevices.containsKey(device.getAddress()))
-                    continue;
-
-                BleDevices deviceHolder = new BleDevices(device);
-
-                String friendlyName = getFriendlyName(device.getAddress());
-                if ( friendlyName != null)
-                    deviceHolder.setFriendlyName(friendlyName);
-
-                mDevices.put(device.getAddress(), deviceHolder);
-                mRecyclerHolder.addDevice(deviceHolder);
-
-                selectList.add(device.getAddress());
-
-                Log.d(TAG, "onBatchScanResults: Added device: " + device.getName() + " " + device.getAddress());
-            }
-
-            mBleServices.connect(selectList);
-            mBleServices.requestBatteryLevel(selectList);
-        }
-
-        @Override
-        public void onScanFailed(final int errorCode) {
-            // empty
-        }
-    };
-
-
-    // Recording
-    boolean recording = false;
-    String mRecordingFileName = "Unknown";
-
     private boolean AnyDeviceConnected() {
-        for ( BleDevices device : mDevices.values()) {
+        for (BleDevices device : mDevices.values()) {
             if (device.connectionStatus >= bleService.DEVICE_STATE_CONNECTED) {
                 return true;
             }
@@ -571,11 +558,10 @@ public class MainActivity extends AppCompatActivity {
         }
 
         if (PackageManager.PERMISSION_DENIED == ContextCompat.checkSelfPermission(MainActivity.this,
-                                                                                    Manifest.permission.WRITE_EXTERNAL_STORAGE))
-        {
+                Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
             Log.d(TAG, "startRecording: Permission denied");
             ActivityCompat.requestPermissions(MainActivity.this,
-                    new String[] {Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                    new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
                     100);
             return;
         }
@@ -625,10 +611,9 @@ public class MainActivity extends AppCompatActivity {
         startActivity(intent);
     }
 
-
     public void saveFriendlyName(String address, String newName) {
         BleDevices device = mDevices.get(address);
-        if (device == null )
+        if (device == null)
             return;
 
         SharedPreferences sharedPref = this.getSharedPreferences(
@@ -643,7 +628,7 @@ public class MainActivity extends AppCompatActivity {
 
     public void clearFriendlyName(String address) {
         BleDevices device = mDevices.get(address);
-        if (device == null )
+        if (device == null)
             return;
 
         SharedPreferences sharedPref = this.getSharedPreferences(
@@ -660,11 +645,45 @@ public class MainActivity extends AppCompatActivity {
         SharedPreferences sharedPref = this.getSharedPreferences(
                 getString(R.string.preference_file_key), Context.MODE_PRIVATE);
 
-        return sharedPref.getString(getString(R.string.friendly_name_prefix)+address, null);
+        return sharedPref.getString(getString(R.string.friendly_name_prefix) + address, null);
     }
 
+    static class logServiceHolder {
+        private Context mContext;
 
-    // Helper classes
+        logServiceHolder(Context context) {
+            mContext = context;
+
+            Intent intent = new Intent(mContext, logService.class);
+            mContext.startService(intent);
+        }
+
+        void stopService() {
+            Intent intent = new Intent(mContext, logService.class);
+            mContext.stopService(intent);
+        }
+
+        void keyframe(String descriptor) {
+            Intent intent = new Intent(logService.ACTION_KEYFRAME_LABEL);
+            intent.putExtra(logService.EXTRA_LABEL, descriptor);
+            intent.putExtra(logService.EXTRA_TIMESTAMP, logService.makeTimestamp());
+
+            mContext.sendBroadcast(intent);
+        }
+
+        void startRecording() {
+            Intent intent = new Intent(logService.ACTION_RECORD_START);
+
+            mContext.sendBroadcast(intent);
+        }
+
+        void stopRecording() {
+            Intent intent = new Intent(logService.ACTION_RECORD_STOP);
+
+            mContext.sendBroadcast(intent);
+        }
+    }
+
     class BleDevices {
         BluetoothDevice device;
         String address;
@@ -729,7 +748,7 @@ public class MainActivity extends AppCompatActivity {
             mRecyclerHolder.updateItem(address);
         }
 
-        void setSelected( boolean selected ) {
+        void setSelected(boolean selected) {
             this.itemExpanded = selected;
             mRecyclerHolder.updateItem(address);
         }
@@ -810,42 +829,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    static class logServiceHolder {
-        private Context mContext;
-
-        logServiceHolder(Context context) {
-            mContext = context;
-
-            Intent intent = new Intent(mContext, logService.class);
-            mContext.startService(intent);
-        }
-
-        void stopService() {
-            Intent intent = new Intent(mContext, logService.class);
-            mContext.stopService(intent);
-        }
-
-        void keyframe(String descriptor) {
-            Intent intent = new Intent(logService.ACTION_KEYFRAME_LABEL);
-            intent.putExtra(logService.EXTRA_LABEL, descriptor);
-            intent.putExtra(logService.EXTRA_TIMESTAMP, logService.makeTimestamp());
-
-            mContext.sendBroadcast(intent);
-        }
-
-        void startRecording() {
-            Intent intent = new Intent(logService.ACTION_RECORD_START);
-
-            mContext.sendBroadcast(intent);
-        }
-
-        void stopRecording() {
-            Intent intent = new Intent(logService.ACTION_RECORD_STOP);
-
-            mContext.sendBroadcast(intent);
-        }
-    }
-
     class recyclerViewHolder extends RecyclerView.Adapter<recyclerViewHolder.ViewHolder> {
         private Context mContext;
 
@@ -878,8 +861,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         private String connectionStateToName(int state) {
-            switch (state)
-            {
+            switch (state) {
                 case bleService.DEVICE_STATE_ERROR:
                     return "Error: During Connection";
                 case bleService.DEVICE_STATE_DISCONNECTED:
@@ -901,8 +883,6 @@ public class MainActivity extends AppCompatActivity {
 
         private int connectionStateToColor(int state) {
             switch (state) {
-//                case bleService.DEVICE_STATE_DISCONNECTED:
-//                    return ContextCompat.getColor(mContext, R.color.colorLight);
                 case bleService.DEVICE_STATE_INITIALISING:
                 case bleService.DEVICE_STATE_CONNECTING:
                 case bleService.DEVICE_STATE_DISCOVERING:
@@ -949,7 +929,7 @@ public class MainActivity extends AppCompatActivity {
                     break;
 
                 case bleService.DEVICE_STATE_ERROR:
-                    viewHolder.connectButton.setText("Disconnect");
+                    viewHolder.connectButton.setText("Reconnect");
                     viewHolder.connectButton.setEnabled(true);
                     viewHolder.connectButton.setBackgroundColor(getColor(R.color.colorLight));
                     viewHolder.connectButton.setTextColor(getColor(R.color.colorBlack));
@@ -1051,6 +1031,51 @@ public class MainActivity extends AppCompatActivity {
             return mDevices.size();
         }
 
+        private void onConnectClickCallback(String address) {
+            if (!mDeviceLocation.containsKey(address))
+                return;
+
+            //noinspection ConstantConditions
+            int pos = mDeviceLocation.get(address);
+
+
+            BleDevices device = mDevices.get(pos);
+
+            ArrayList<String> deviceList = new ArrayList<>();
+            deviceList.add(address);
+
+            if (device.connectionStatus != bleService.DEVICE_STATE_DISCONNECTED
+                    && device.connectionStatus != bleService.DEVICE_STATE_ERROR) {
+                mBleServices.disconnect(deviceList);
+            } else {
+                mBleServices.connect(deviceList);
+            }
+        }
+
+        private void onButtonClickCallback(String address) {
+            item_select_button(address);
+            updateItem(address);
+        }
+
+        private void onNameClickCallback(String address, String newName) {
+            if (!mDeviceLocation.containsKey(address))
+                return;
+
+            //noinspection ConstantConditions
+            int pos = mDeviceLocation.get(address);
+
+            BleDevices device = mDevices.get(pos);
+
+            if (device.editing) {
+                if (newName.equals(""))
+                    clearFriendlyName(address);
+                else
+                    saveFriendlyName(address, newName);
+            }
+
+            device.setEditing(!device.editing);
+        }
+
         class ViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener {
             String address;
 
@@ -1079,7 +1104,7 @@ public class MainActivity extends AppCompatActivity {
             Button connectButton;
             Button renameButton;
 
-            ViewHolder(@NonNull View itemView)  {
+            ViewHolder(@NonNull View itemView) {
                 super(itemView);
 
                 mAdditionalDetails = itemView.findViewById(R.id.addition_details);
@@ -1132,50 +1157,6 @@ public class MainActivity extends AppCompatActivity {
                     onConnectClickCallback(address);
                 }
             }
-        }
-
-        private void onConnectClickCallback(String address) {
-            if (!mDeviceLocation.containsKey(address))
-                return;
-
-            //noinspection ConstantConditions
-            int pos = mDeviceLocation.get(address);
-
-
-            BleDevices device = mDevices.get(pos);
-
-            ArrayList<String> deviceList = new ArrayList<>();
-            deviceList.add(address);
-
-            if (device.connectionStatus != bleService.DEVICE_STATE_DISCONNECTED) {
-                mBleServices.disconnect(deviceList);
-            } else {
-                mBleServices.connect(deviceList);
-            }
-        }
-
-        private void onButtonClickCallback(String address) {
-            item_select_button(address);
-            updateItem(address);
-        }
-
-        private void onNameClickCallback(String address, String newName) {
-            if (!mDeviceLocation.containsKey(address))
-                return;
-
-            //noinspection ConstantConditions
-            int pos = mDeviceLocation.get(address);
-
-            BleDevices device = mDevices.get(pos);
-
-            if (device.editing) {
-                if (newName.equals(""))
-                    clearFriendlyName(address);
-                else
-                    saveFriendlyName(address, newName);
-            }
-
-            device.setEditing(!device.editing);
         }
     }
 }
