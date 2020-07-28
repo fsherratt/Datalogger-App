@@ -514,6 +514,7 @@ public class bleService extends Service {
         final UUID batteryServiceUUID = UUID.fromString("180F-0000-1000-8000-00805f9b34fb");
         final UUID batteryCharacteristicUUID = UUID.fromString("2A19-0000-1000-8000-00805f9b34fb");
         final UUID clientCharacterisitcConfig = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
+
         private String TAG;
         private Context mContext;
         private int mConnectionState;
@@ -523,7 +524,6 @@ public class bleService extends Service {
         private BluetoothGattCallback mGattCallback;
 
         private Semaphore mCharWriteSemaphore = new Semaphore(1, true);
-
 
         bleGattDevice(Context context, BluetoothDevice device) {
             TAG = "BluetoothGattDevice-" + device.getAddress();
@@ -695,7 +695,6 @@ public class bleService extends Service {
             }
 
             // Enable on device
-//            descriptorUpdateUUID = characteristic.getUuid().toString();
             mDeviceGatt.writeDescriptor(descriptor);
         }
 
