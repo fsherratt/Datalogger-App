@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    app:layout_constraintEnd_toEndOf="parent"
+    app:layout_constraintStart_toStartOf="parent"
+    app:layout_constraintTop_toTopOf="parent">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/quick_status"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:maxWidth="250dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/constraintLayout5"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <ImageView
+                android:id="@+id/rssi_image_view"
+                android:layout_width="25dp"
+                android:layout_height="25dp"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:srcCompat="@drawable/ic_signal_cellular_3_bar_black_24dp" />
+
+            <TextView
+                android:id="@+id/rssi_text_view"
+                android:layout_width="45dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="-127db"
+                app:layout_constraintBottom_toBottomOf="@+id/rssi_image_view"
+                app:layout_constraintStart_toEndOf="@+id/rssi_image_view"
+                app:layout_constraintTop_toTopOf="@+id/rssi_image_view" />
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/constraintLayout"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <TextView
+                android:id="@+id/rssi_value"
+                android:layout_width="35dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="2dp"
+                android:text="100%"
+                app:layout_constraintBottom_toBottomOf="@+id/battery_image_view"
+                app:layout_constraintStart_toEndOf="@+id/battery_image_view"
+                app:layout_constraintTop_toTopOf="@+id/battery_image_view" />
+
+            <ImageView
+                android:id="@+id/battery_image_view"
+                android:layout_width="25dp"
+                android:layout_height="25dp"
+                android:layout_marginStart="8dp"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:srcCompat="@drawable/ic_battery_50_black_24dp" />
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/constraintLayout4"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <TextView
+                android:id="@+id/freq_value"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="5dp"
+                android:text="99999"
+                app:layout_constraintBottom_toBottomOf="@+id/time_image_view"
+                app:layout_constraintStart_toEndOf="@+id/time_image_view"
+                app:layout_constraintTop_toTopOf="@+id/time_image_view" />
+
+            <ImageView
+                android:id="@+id/time_image_view"
+                android:layout_width="25dp"
+                android:layout_height="25dp"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:srcCompat="@drawable/ic_sync_black_24dp" />
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/device_details"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.495"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/quick_status">
+
+        <TextView
+            android:id="@+id/textView_move_id"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="-"
+            app:layout_constraintStart_toStartOf="@+id/textView_physical"
+            app:layout_constraintTop_toBottomOf="@+id/textView_physical" />
+
+        <TextView
+            android:id="@+id/id_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Movesense ID "
+            android:textStyle="bold"
+            app:layout_constraintBottom_toBottomOf="@+id/textView_move_id"
+            app:layout_constraintEnd_toEndOf="@+id/address_Label"
+            app:layout_constraintTop_toTopOf="@+id/textView_move_id" />
+
+        <TextView
+            android:id="@+id/textView_physical"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:text="00:00:00:00:00:00 "
+            app:layout_constraintStart_toEndOf="@+id/address_Label"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/address_Label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Physical Address "
+            android:textStyle="bold"
+            app:layout_constraintBottom_toBottomOf="@+id/textView_physical"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="@+id/textView_physical" />
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

@@ -48,7 +48,7 @@ public class SaveActivity extends AppCompatActivity {
     private AutoCompleteTextView mGender;
     private Button mUpload;
     // UI Uploading Popup
-    private PopUpClass mPopUpWindow;
+    private SavePopUpClass mPopUpWindow;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -64,7 +64,7 @@ public class SaveActivity extends AppCompatActivity {
         mUpload = findViewById(R.id.upload_button);
 
         final ArrayList<String> genderList = new ArrayList<>(Arrays.asList(getResources().getStringArray(R.array.gender_options)));
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, R.layout.list_item, genderList);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, R.layout.gender_list_item, genderList);
         mGender.setAdapter(adapter);
         getFiles();
 
@@ -99,7 +99,7 @@ public class SaveActivity extends AppCompatActivity {
             return;
         }
 
-        mPopUpWindow = new PopUpClass(this);
+        mPopUpWindow = new SavePopUpClass(this);
 
         mPopUpWindow.setOnDismissCallback(this::onDismissClass);
 

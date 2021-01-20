@@ -36,157 +36,32 @@
             app:layout_constraintStart_toStartOf="parent">
 
             <androidx.constraintlayout.widget.ConstraintLayout
-                android:id="@+id/constraintLayout3"
+                android:id="@+id/custom_details"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toTopOf="parent">
 
-                <androidx.constraintlayout.widget.ConstraintLayout
-                    android:id="@+id/constraintLayout"
-                    android:layout_width="wrap_content"
+                <ViewStub
+                    android:id="@+id/addition_details_stub"
+                    android:inflatedId="@+id/addition_details_layout"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     app:layout_constraintEnd_toEndOf="parent"
                     app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintTop_toTopOf="parent">
-
-                    <TextView
-                        android:id="@+id/battery_text_view"
-                        android:layout_width="40dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="2dp"
-                        android:text="-"
-                        app:layout_constraintBottom_toBottomOf="@+id/batt_image_view"
-                        app:layout_constraintStart_toEndOf="@+id/batt_image_view"
-                        app:layout_constraintTop_toTopOf="@+id/batt_image_view" />
-
-                    <ImageView
-                        android:id="@+id/batt_image_view"
-                        android:layout_width="25dp"
-                        android:layout_height="25dp"
-                        app:layout_constraintStart_toStartOf="parent"
-                        app:layout_constraintTop_toTopOf="parent"
-                        app:srcCompat="@drawable/ic_battery_50_black_24dp" />
-                </androidx.constraintlayout.widget.ConstraintLayout>
-
-                <androidx.constraintlayout.widget.ConstraintLayout
-                    android:id="@+id/constraintLayout4"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    app:layout_constraintEnd_toEndOf="parent"
-                    app:layout_constraintStart_toEndOf="@+id/constraintLayout"
-                    app:layout_constraintTop_toTopOf="parent">
-
-                    <TextView
-                        android:id="@+id/samples_text_view"
-                        android:layout_width="40dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="5dp"
-                        android:text="-"
-                        android:textColor="@color/colorText"
-                        app:layout_constraintBottom_toBottomOf="@+id/samples_image_view"
-                        app:layout_constraintStart_toEndOf="@+id/samples_image_view"
-                        app:layout_constraintTop_toTopOf="@+id/samples_image_view" />
-
-                    <ImageView
-                        android:id="@+id/samples_image_view"
-                        android:layout_width="25dp"
-                        android:layout_height="25dp"
-                        app:layout_constraintStart_toStartOf="parent"
-                        app:layout_constraintTop_toTopOf="parent"
-                        app:srcCompat="@drawable/ic_sync_black_24dp" />
-
-                </androidx.constraintlayout.widget.ConstraintLayout>
-
-                <androidx.constraintlayout.widget.ConstraintLayout
-                    android:id="@+id/constraintLayout5"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    app:layout_constraintEnd_toStartOf="@+id/constraintLayout"
-                    app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintTop_toTopOf="parent">
-
-                    <ImageView
-                        android:id="@+id/rssi_image_view"
-                        android:layout_width="25dp"
-                        android:layout_height="25dp"
-                        app:layout_constraintStart_toStartOf="parent"
-                        app:layout_constraintTop_toTopOf="parent"
-                        app:srcCompat="@drawable/ic_signal_cellular_3_bar_black_24dp" />
-
-                    <TextView
-                        android:id="@+id/rssi_text_view"
-                        android:layout_width="40dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
-                        android:text="-"
-                        android:textColor="@color/colorText"
-                        app:layout_constraintBottom_toBottomOf="@+id/rssi_image_view"
-                        app:layout_constraintStart_toEndOf="@+id/rssi_image_view"
-                        app:layout_constraintTop_toTopOf="@+id/rssi_image_view" />
-                </androidx.constraintlayout.widget.ConstraintLayout>
-            </androidx.constraintlayout.widget.ConstraintLayout>
-
-            <androidx.constraintlayout.widget.ConstraintLayout
-                android:id="@+id/constraintLayout2"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintHorizontal_bias="0.495"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@+id/constraintLayout3">
-
-                <TextView
-                    android:id="@+id/textView_move_id"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="192630003196"
-                    android:textSize="18sp"
-                    app:layout_constraintStart_toStartOf="@+id/textView_physical"
-                    app:layout_constraintTop_toBottomOf="@+id/textView_physical" />
-
-                <TextView
-                    android:id="@+id/id_label"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Movesense ID "
-                    android:textStyle="bold"
-                    app:layout_constraintBottom_toBottomOf="@+id/textView_move_id"
-                    app:layout_constraintEnd_toEndOf="@+id/address_Label"
-                    app:layout_constraintTop_toTopOf="@+id/textView_move_id" />
-
-                <TextView
-                    android:id="@+id/textView_physical"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="10dp"
-                    android:text="0C:8C:DC:2E:32:67 "
-                    android:textSize="18sp"
-                    app:layout_constraintEnd_toEndOf="parent"
-                    app:layout_constraintStart_toEndOf="@+id/address_Label"
-                    app:layout_constraintTop_toTopOf="parent" />
-
-                <TextView
-                    android:id="@+id/address_Label"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Physical Address "
-                    android:textStyle="bold"
-                    app:layout_constraintBottom_toBottomOf="@+id/textView_physical"
-                    app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintTop_toTopOf="@+id/textView_physical" />
+                    app:layout_constraintTop_toTopOf="parent"/>
+<!--                <include layout="@layout/movesense_additional_layout"/>-->
             </androidx.constraintlayout.widget.ConstraintLayout>
 
             <TableRow
+                android:id="@+id/buttons"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_marginTop="8dp"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@+id/constraintLayout2">
+                app:layout_constraintTop_toBottomOf="@+id/custom_details">
 
                 <androidx.constraintlayout.widget.ConstraintLayout
                     android:layout_width="match_parent"
@@ -255,8 +130,7 @@
                 android:layout_width="70dp"
                 android:layout_height="70dp"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toTopOf="parent"
-                app:srcCompat="@drawable/movesense_icon" />
+                app:layout_constraintTop_toTopOf="parent" />
 
             <ImageView
                 android:id="@+id/status_dot"

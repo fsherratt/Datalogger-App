@@ -22,6 +22,7 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewStub;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
@@ -44,6 +45,7 @@ import com.google.android.material.snackbar.Snackbar;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.HashMap;
 import java.util.List;
 
@@ -64,6 +66,7 @@ public class MainActivity extends AppCompatActivity {
     private Handler mHandler;
     private Runnable mRssiRunable;
     private Runnable mBattRunable;
+    private Runnable mSDOTimeRunable;
     private BleServiceHolder mBleServices;
     private logServiceHolder mLogService;
     private recyclerViewHolder mRecyclerHolder;
@@ -93,17 +96,20 @@ public class MainActivity extends AppCompatActivity {
                 if (name == null)
                     continue;
 
-                if (!device.getName().toUpperCase().contains("MOVESENSE"))
+                BleDevices deviceHolder;
+                if (device.getName().toUpperCase().contains("MOVESENSE"))
+                    deviceHolder = new MovesenseDevice(device);
+                else if (device.getName().toUpperCase().contains("-V7REU-"))
+                    deviceHolder = new ThumbREUDevice(device);
+
+                else
                     continue;
 
                 if (mDevices.containsKey(device.getAddress()))
                     continue;
 
-                BleDevices deviceHolder = new BleDevices(device);
-
-                String friendlyName = getFriendlyName(device.getAddress());
-                if (friendlyName != null)
-                    deviceHolder.setFriendlyName(friendlyName);
+                String friendly_name = getFriendlyName(device.getAddress());
+                deviceHolder.setFriendlyName(friendly_name);
 
                 mDevices.put(device.getAddress(), deviceHolder);
                 mRecyclerHolder.addDevice(deviceHolder);
@@ -123,7 +129,6 @@ public class MainActivity extends AppCompatActivity {
         }
     };
     private Runnable mScanTimeout = this::stopScanner;
-
     {
         mGattUpdateReceiver = new BroadcastReceiver() {
             @Override
@@ -173,8 +178,23 @@ public class MainActivity extends AppCompatActivity {
                 mHandler.postDelayed(this, 5000);
             }
         };
-        mHandler.postDelayed(mRssiRunable, 5000);
 
+        mSDOTimeRunable = new Runnable() {
+            @Override
+            public void run() {
+                for (BleDevices device : mDevices.values())
+                    if (device.deviceType == DEVICE_TYPE_THUMBREU) {
+                        if (device.connectionStatus >= bleService.DEVICE_STATE_CONNECTED) {
+                            getRTC(device.address);
+                            getSDCardLogState(device.address);
+                            getBattery(device.address);
+                            getSysStatus(device.address);
+                        }
+                    }
+
+                mHandler.postDelayed(this, 5000);
+            }
+        };
 
         mBattRunable = new Runnable() {
             @Override
@@ -185,22 +205,39 @@ public class MainActivity extends AppCompatActivity {
                 mHandler.postDelayed(this, 30000);
             }
         };
-        mHandler.postDelayed(mBattRunable, 30000);
+
+        startCallbacks();
+    }
+
+    private void removeCallbacks() {
+        Log.d(TAG, "removeCallbacks: removing callbacks");
+        mHandler.removeCallbacks(mRssiRunable);
+        mHandler.removeCallbacks(mBattRunable);
+        mHandler.removeCallbacks(mSDOTimeRunable);
+    }
+
+    private void startCallbacks() {
+        Log.d(TAG, "startCallbacks: removing callbacks");
+        mHandler.postDelayed(mRssiRunable, 300);
+        mHandler.postDelayed(mBattRunable, 500);
+        mHandler.postDelayed(mSDOTimeRunable, 100);
+    }
+    private void restartCallbacks() {
+        removeCallbacks();
+        startCallbacks();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        mHandler.postDelayed(mRssiRunable, 5000);
-        mHandler.postDelayed(mBattRunable, 30000);
+        restartCallbacks();
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         stopScanner();
-        mHandler.removeCallbacks(mRssiRunable);
-        mHandler.removeCallbacks(mBattRunable);
+        removeCallbacks();
     }
 
     @Override
@@ -213,6 +250,7 @@ public class MainActivity extends AppCompatActivity {
         mLogService.stopService();
         mHandler.removeCallbacks(mRssiRunable);
         mHandler.removeCallbacks(mBattRunable);
+        mHandler.removeCallbacks(mSDOTimeRunable);
     }
 
     @Override
@@ -355,6 +393,7 @@ public class MainActivity extends AppCompatActivity {
         intentFilter.addAction(bleService.ACTION_BATTERY_LEVEL);
         intentFilter.addAction(logService.ACTION_DEVICE_FREQ);
         intentFilter.addAction(logService.ACTION_SAVE_FILE_NAME);
+        intentFilter.addAction(bleService.ACTION_SDO_DATA_AVAILABLE);
 
         try {
             registerReceiver(mGattUpdateReceiver, intentFilter);
@@ -382,26 +421,29 @@ public class MainActivity extends AppCompatActivity {
             return;
 
         switch (action) {
-            case bleService.ACTION_GATT_STATE_CHANGED:
+            case bleService.ACTION_GATT_STATE_CHANGED: {
                 final int state = intent.getIntExtra(bleService.EXTRA_STATE, -1);
 
                 device.setConnectionStatus(state);
                 break;
+            }
 
-            case bleService.ACTION_DEVICE_RSSI:
+            case bleService.ACTION_DEVICE_RSSI: {
                 int rssi = intent.getIntExtra(bleService.EXTRA_RSSI, 0);
 
                 device.setRssi(rssi);
                 break;
+            }
 
-            case bleService.ACTION_BATTERY_LEVEL:
+            case bleService.ACTION_BATTERY_LEVEL: {
                 int batLvl = intent.getIntExtra(bleService.EXTRA_BATTERY, 0);
 
                 device.setBatt(batLvl);
                 Log.d(TAG, "mGattUpdateReceiver: Action_Battery_Level: " + batLvl);
                 break;
+            }
 
-            case logService.ACTION_DEVICE_FREQ:
+            case logService.ACTION_DEVICE_FREQ: {
                 int freq = intent.getIntExtra(logService.EXTRA_FREQ, 0);
                 int err = intent.getIntExtra(logService.EXTRA_ERROR, 0);
 
@@ -425,8 +467,17 @@ public class MainActivity extends AppCompatActivity {
                     snackbar.show();
                 }
 
-                device.setFreq(freq);
+                MovesenseDevice mvDevice = (MovesenseDevice) device;
+                mvDevice.setFreq(freq);
                 break;
+            }
+
+            case bleService.ACTION_SDO_DATA_AVAILABLE: {
+                final byte[] byte_array = intent.getByteArrayExtra(bleService.EXTRA_DATA);
+
+                ThumbREUDevice thumbDevice = (ThumbREUDevice)device;
+                thumbDevice.decodeSDO(byte_array);
+            }
         }
     }
 
@@ -455,18 +506,6 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        BluetoothLeScannerCompat scanner = BluetoothLeScannerCompat.getScanner();
-        ScanSettings settings = new ScanSettings.Builder()
-                .setLegacy(false)
-                .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
-                .setReportDelay(1000)
-                .setUseHardwareBatchingIfSupported(false)
-                .build();
-        List<ScanFilter> filters = new ArrayList<>();
-        scanner.startScan(filters, settings, mScanCallback);
-
-        Log.d(TAG, "stopScanner: Scan started");
-
         mScanning = true;
         mSwipeRefresh.setRefreshing(true);
 
@@ -474,7 +513,19 @@ public class MainActivity extends AppCompatActivity {
             mMenu.getItem(0).setIcon(ContextCompat.getDrawable(this, R.drawable.ic_cancel_black_24dp));
         }
 
-        mHandler.postDelayed(mScanTimeout, 2500);
+        BluetoothLeScannerCompat scanner = BluetoothLeScannerCompat.getScanner();
+        ScanSettings settings = new ScanSettings.Builder()
+                .setLegacy(false)
+                .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+                .setReportDelay(1)
+                .setUseHardwareBatchingIfSupported(false)
+                .build();
+        List<ScanFilter> filters = new ArrayList<>();
+        scanner.startScan(filters, settings, mScanCallback);
+
+        Log.d(TAG, "stopScanner: Scan started");
+
+        mHandler.postDelayed(mScanTimeout, 4000);
     }
 
     public void stopScanner() {
@@ -557,7 +608,7 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        if (PackageManager.PERMISSION_DENIED == ContextCompat.checkSelfPermission(MainActivity.this,
+        if (PackageManager.PERMISSION_GRANTED != ContextCompat.checkSelfPermission(MainActivity.this,
                 Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
             Log.d(TAG, "startRecording: Permission denied");
             ActivityCompat.requestPermissions(MainActivity.this,
@@ -574,12 +625,38 @@ public class MainActivity extends AppCompatActivity {
         mRecord.setCompoundDrawablesWithIntrinsicBounds(getDrawable(R.drawable.ic_stop_box), null, null, null);
 
         mLogService.startRecording();
-        mBleServices.startRecording(new ArrayList<>(mDevices.keySet()));
+
+
+        // Enable recording on devices
+        ArrayList<String> movesenseDevices = new ArrayList<>();
+
+        for (BleDevices device : mDevices.values()) {
+            if (device.deviceType == DEVICE_TYPE_MOVESENSE ) {
+                movesenseDevices.add(device.address);
+            } else if (device.deviceType == DEVICE_TYPE_THUMBREU) {
+                setSDCardLogState(device.address, SDCARD_ENABLE_LOG_COMMAND);
+                getSDCardLogState(device.address);
+            }
+        }
+
+        mBleServices.startRecording(movesenseDevices);
     }
 
     public void stopRecording() {
+        // Disable recording on devices
+        ArrayList<String> movesenseDevices = new ArrayList<>();
+
+        for (BleDevices device : mDevices.values()) {
+            if (device.deviceType == DEVICE_TYPE_MOVESENSE ) {
+                movesenseDevices.add(device.address);
+            } else if (device.deviceType == DEVICE_TYPE_THUMBREU) {
+                setSDCardLogState(device.address, SDCARD_DISABLE_LOG_COMMAND);
+                getSDCardLogState(device.address);
+            }
+        }
+
+        mBleServices.stopRecording(movesenseDevices);
         mLogService.stopRecording();
-        mBleServices.stopRecording(new ArrayList<>(mDevices.keySet()));
 
         recording = false;
 
@@ -648,6 +725,8 @@ public class MainActivity extends AppCompatActivity {
         return sharedPref.getString(getString(R.string.friendly_name_prefix) + address, null);
     }
 
+
+    // Log service
     static class logServiceHolder {
         private Context mContext;
 
@@ -684,16 +763,21 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+
+    // Device Data holder
+    private final static int DEVICE_TYPE_GENERIC = 0;
+    private final static int DEVICE_TYPE_MOVESENSE = 1;
+    private final static int DEVICE_TYPE_THUMBREU = 2;
+
     class BleDevices {
+        int deviceType;
+
         BluetoothDevice device;
         String address;
         String name;
         String friendlyName;
 
         int connectionStatus;
-        int rssi;
-        int batt;
-        int freq;
 
         Boolean itemExpanded;
         Boolean editing;
@@ -701,65 +785,52 @@ public class MainActivity extends AppCompatActivity {
 
         String errorMessage;
 
-        BleDevices(BluetoothDevice device) {
-            setup(device);
-        }
+        int rssi;
+        int batt;
 
-        private void setup(BluetoothDevice device) {
+        BleDevices(BluetoothDevice device) {
+            this.deviceType = DEVICE_TYPE_GENERIC;
+
             this.device = device;
             this.address = device.getAddress();
 
-            String[] temp = device.getName().split(" ", 2);
-            List<String> list = new ArrayList<>(Arrays.asList(temp));
-
-            this.name = list.get(1);
+            lookupName(device.getName());
             this.friendlyName = null;
 
             this.connectionStatus = 0;
-            this.rssi = 0;
-            this.batt = 0;
 
             this.itemExpanded = false;
             this.editing = false;
             this.enableEdit = false;
+
+            this.rssi = 0;
+            this.batt = 0;
+        }
+
+        private void lookupName(String device_Name) {
+            this.name = device_Name;
+        }
+
+        void setFriendlyName(String friendlyName) {
+            this.friendlyName = friendlyName;
+            mRecyclerHolder.updateItem(address);
         }
 
         void setConnectionStatus(int connectionStatus) {
             this.connectionStatus = connectionStatus;
 
-            if (connectionStatus == bleService.DEVICE_STATE_DISCONNECTED) {
+            if (connectionStatus == bleService.DEVICE_STATE_ERROR) {
+                errorMessage = "Error: During Connection";
+            } else if (connectionStatus == bleService.DEVICE_STATE_DISCONNECTED) {
                 this.rssi = 0;
                 this.batt = 0;
-                this.freq = 0;
-            } else if (connectionStatus == bleService.DEVICE_STATE_ERROR) {
-                errorMessage = "Error: During Connection";
             }
 
             mRecyclerHolder.updateItem(address);
         }
 
-        void setRssi(int rssi) {
-            this.rssi = rssi;
-            mRecyclerHolder.updateItem(address);
-        }
-
-        void setBatt(int batt) {
-            this.batt = batt;
-            mRecyclerHolder.updateItem(address);
-        }
-
         void setSelected(boolean selected) {
             this.itemExpanded = selected;
-            mRecyclerHolder.updateItem(address);
-        }
-
-        void setFreq(int freq) {
-            this.freq = freq;
-            mRecyclerHolder.updateItem(address);
-        }
-
-        void setFriendlyName(String friendlyName) {
-            this.friendlyName = friendlyName;
             mRecyclerHolder.updateItem(address);
         }
 
@@ -771,10 +842,201 @@ public class MainActivity extends AppCompatActivity {
 
             mRecyclerHolder.updateItem(address);
         }
+
+        void setRssi(int rssi) {
+            this.rssi = rssi;
+            mRecyclerHolder.updateItem(address);
+        }
+
+        void setBatt(int batt) { }
     }
 
+    class MovesenseDevice extends BleDevices {
+
+        int freq;
+
+        MovesenseDevice(BluetoothDevice device) {
+            super(device);
+
+            this.deviceType = DEVICE_TYPE_MOVESENSE;
+            this.freq = 0;
+
+            setName(device.getName());
+        }
+
+        private void setName(String device_Name) {
+            String dict_name = deviceNameDict.lookup(address);
+            if (dict_name != null) {
+                this.name = dict_name;
+            } else {
+                String[] temp = device_Name.split(" ", 2);
+                List<String> list = new ArrayList<>(Arrays.asList(temp));
+
+                this.name = list.get(1);
+            }
+        }
+
+        void setFreq(int freq) {
+            this.freq = freq;
+            mRecyclerHolder.updateItem(address);
+        }
+
+        void setBatt(int batt) {
+            this.batt = batt;
+            mRecyclerHolder.updateItem(address);
+        }
+
+        void setConnectionStatus(int connectionStatus) {
+            super.setConnectionStatus(connectionStatus);
+
+            if (connectionStatus == bleService.DEVICE_STATE_CONNECTED && this.batt == 0) {
+                ArrayList<String> deviceList = new  ArrayList<>(Arrays.asList(this.address));
+                mBleServices.requestBatteryLevel(deviceList);
+                mBleServices.requestRssi(deviceList);
+            } else if (connectionStatus == bleService.DEVICE_STATE_DISCONNECTED) {
+                this.freq = 0;
+            }
+
+            mRecyclerHolder.updateItem(address);
+        }
+    }
+
+    class ThumbREUDevice extends BleDevices {
+        private static final int SDO_OFFSET = 1;
+        private static final int DATA_OFFSET = 4;
+
+        private static final byte READ_RESPONSE = 0x42; // Read Response: 0x42,   Data: 0xKK-LL-MM-NN [Valid data from REU]
+        private static final byte WRITE_RESPONSE = 0x60; // Write Response: 0x60,  Data: 0x00-00-00-00
+        private static final byte ABORT_RESPONSE = (byte)0x80; // Abort Response: 0x80,  Data: 0xKK-LL-MM-NN [ Valid Abort code from REU]
+
+        int mRTCDateVal;
+        int mRTCTimeVal;
+        String rtc_text;
+        int mFirmware;
+
+        int recording;
+        int actualState;
+        int sys_state;
+
+        ThumbREUDevice(BluetoothDevice device) {
+            super(device);
+
+            this.deviceType = DEVICE_TYPE_THUMBREU;
+
+            mFirmware = 0;
+            sys_state = SYS_STATE_INITALIZE;
+
+            mRTCDateVal = 0;
+            mRTCTimeVal = 0;
+
+            update_rtc_text();
+        }
+
+
+        // Convert incoming SDO to human readable
+        public void decodeSDO( byte[] data) {
+            Log.d(TAG, "setSDORead: byte array " + Arrays.toString(data));
+            int incomingSDO = byteTypecast.bytesToInt16(data, SDO_OFFSET);
+            if ( data[0] == READ_RESPONSE ) {
+                switch (incomingSDO) {
+                    case RTC_READ_DATE_SDO:
+                        mRTCDateVal = byteTypecast.bytesToInt32(data, DATA_OFFSET);
+                        update_rtc_text();
+                        break;
+
+                    case RTC_READ_TIME_SDO:
+                        mRTCTimeVal = byteTypecast.bytesToInt32(data, DATA_OFFSET);
+                        update_rtc_text();
+                        break;
+
+                    case SW_VERSION_SDO:
+                        mFirmware = byteTypecast.bytesToInt32(data, DATA_OFFSET);
+                        break;
+
+                    case SDCARD_LOG_ENABLE_SDO:
+                        recording = byteTypecast.bytesToInt32(data, DATA_OFFSET);
+                        setConnectionStatus(actualState);
+                        break;
+
+                    case BAT_REMAINING_SDO:
+                        batt = byteTypecast.bytesToInt32(data, DATA_OFFSET);
+                        break;
+
+                    case SYSTEM_STATE_SDO:
+                        sys_state = byteTypecast.bytesToInt32(data, DATA_OFFSET);
+                        break;
+                }
+
+                mRecyclerHolder.updateItem(address);
+//            } else if ( data[0] == WRITE_RESPONSE ) {
+//                Toast.makeText(getApplicationContext(), "Write Response: " + typesetting.bytesToHex(data), Toast.LENGTH_SHORT).show();
+            } else if ( data[0] == ABORT_RESPONSE ) {
+                String abort_response = byteTypecast.bytesToHex(data, DATA_OFFSET);
+                String msg = "Abort Response: " + name + "\n";
+                switch (incomingSDO) {
+                    case SDCARD_LOG_ENABLE_SDO:
+                        msg += "SDCARD_LOG_ENABLE";
+                        break;
+
+                    case RTC_SET_DATE_SDO:
+                        msg += "RTC_SET_DATE";
+                        break;
+
+                    case RTC_SET_TIME_SDO:
+                        msg += "RTC_SET_TIME";
+                        break;
+                }
+
+                View contextView = findViewById(android.R.id.content);
+                Snackbar snackbar = Snackbar.make(contextView, msg + " 0x" + abort_response, Snackbar.LENGTH_INDEFINITE);
+                snackbar.setAction("Close", v -> snackbar.dismiss());
+                snackbar.show();
+            }
+        }
+
+        private void update_rtc_text() {
+            int hour = mRTCTimeVal / 10000;
+            int minute = (mRTCTimeVal % 10000) / 100;
+            int second = mRTCTimeVal % 100;
+
+
+            int year = (mRTCDateVal / 1000000) + 2000;
+            int month = (mRTCDateVal % 1000000) / 10000;
+            int day = (mRTCDateVal % 10000) / 100;
+
+            rtc_text = String.format("%04d-%02d-%02d - %02d:%02d:%02d", year, month, day, hour, minute, second);
+        }
+
+        void setConnectionStatus(int connectionStatus) {
+            super.setConnectionStatus(connectionStatus);
+
+            actualState = connectionStatus;
+            if (actualState == bleService.DEVICE_STATE_CONNECTED && recording == SDCARD_ENABLE_LOG_COMMAND ) {
+                this.connectionStatus = bleService.DEVICE_STATE_STREAMING;
+            }
+
+            if (actualState == bleService.DEVICE_STATE_DISCONNECTED) {
+                this.mRTCTimeVal = 0;
+                this.mRTCDateVal = 0;
+                this.mFirmware = 0;
+                this.sys_state = -1;
+                update_rtc_text();
+
+            } else if (actualState == bleService.DEVICE_STATE_CONNECTED && mRTCDateVal == 0) {  // Action on first connection
+                getFirmware(address);
+                setRTC(address);
+                getBattery(address);
+                getSysStatus(address);
+            }
+
+            mRecyclerHolder.updateItem(address);
+        }
+    }
+
+
+    // BLE Service Connection
     class BleServiceHolder {
-        private Context mContext;
+        private final Context mContext;
 
         BleServiceHolder(Context context) {
             mContext = context;
@@ -789,10 +1051,23 @@ public class MainActivity extends AppCompatActivity {
         }
 
         void connect(ArrayList<String> bleDevices) {
-            Intent intent = new Intent(bleService.ACTION_ADD_GATT_DEVICES);
-            intent.putStringArrayListExtra(bleService.EXTRA_ADDRESS_LIST, bleDevices);
 
-            mContext.sendBroadcast(intent);
+            for (String deviceAddress : bleDevices) {
+                BleDevices device = mDevices.get(deviceAddress);
+                String device_type = null;
+
+                if (device instanceof MovesenseDevice)
+                    device_type = bleService.DEVICE_TYPE_MOVESENSE;
+                else if (device instanceof ThumbREUDevice)
+                    device_type = bleService.DEVICE_TYPE_THUMBREU;
+
+                Intent intent = new Intent(bleService.ACTION_ADD_GATT_DEVICES);
+                intent.putExtra(bleService.EXTRA_ADDRESS, deviceAddress);
+                intent.putExtra(bleService.EXTRA_DEVICE_TYPE, device_type);
+
+                mContext.sendBroadcast(intent);
+            }
+
         }
 
         void disconnect(ArrayList<String> bleDevices) {
@@ -805,7 +1080,6 @@ public class MainActivity extends AppCompatActivity {
         void startRecording(ArrayList<String> bleDevices) {
             Intent intent = new Intent(bleService.ACTION_START_STREAM_DEVICES);
             intent.putStringArrayListExtra(bleService.EXTRA_ADDRESS_LIST, bleDevices);
-
             mContext.sendBroadcast(intent);
         }
 
@@ -827,8 +1101,153 @@ public class MainActivity extends AppCompatActivity {
             intent.putStringArrayListExtra(bleService.EXTRA_ADDRESS_LIST, bleDevices);
             sendBroadcast(intent);
         }
+
+
+        // SDO Queue actions
+        void readSDOAction(String bleDevice) {
+            Intent read_intent = new Intent(bleService.ACTION_SDO_READ);
+            read_intent.putExtra(bleService.EXTRA_ADDRESS, bleDevice);
+            sendBroadcast(read_intent);
+        }
+
+        void writeSDOAction(String bleDevice, byte[] byte_array) {
+            Intent write_intent = new Intent(bleService.ACTION_SDO_WRITE);
+            write_intent.putExtra(bleService.EXTRA_ADDRESS, bleDevice);
+            write_intent.putExtra(bleService.EXTRA_SDO_BYTE_ARRAY, byte_array);
+            sendBroadcast(write_intent);
+        }
+
+        void readSDO( String bleDevice, int SDO ) {
+
+            byte SDO_LSB = (byte) (SDO & 0xFF);
+            byte SDO_MSB = (byte) ((SDO >> 8) & 0xFF);
+
+            byte[] writeRequest = {READ_COMMAND, SDO_LSB, SDO_MSB, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+            writeSDOAction(bleDevice, writeRequest);
+            readSDOAction(bleDevice);
+        }
+
+        void writeByteSDO( String bleDevice, int SDO, byte val  ) {
+
+            byte SDO_LSB = (byte) (SDO & 0xFF);
+            byte SDO_MSB = (byte) ((SDO >> 8) & 0xFF);
+
+            byte[] writeRequest = {WRITE_COMNAND, SDO_LSB, SDO_MSB, 0x00, val, 0x00, 0x00, 0x00};
+
+            writeSDOAction(bleDevice, writeRequest);
+            readSDOAction(bleDevice);
+        }
+
+        void writeFourByteArraySDO(String bleDevice, int SDO, byte[] val ) {
+
+            byte SDO_LSB = (byte) (SDO & 0xFF);
+            byte SDO_MSB = (byte) ((SDO >> 8) & 0xFF);
+
+            byte[] writeRequest = {WRITE_COMNAND, SDO_LSB, SDO_MSB, 0x00, val[0], val[1], val[2], val[3]};
+
+            writeSDOAction(bleDevice, writeRequest);
+            readSDOAction(bleDevice);
+        }
+
+        private void writeFloatSDO( String bleDevice, int SDO, float value ) {
+            byte SDO_LSB = (byte) (SDO & 0xFF);
+            byte SDO_MSB = (byte) ((SDO >> 8) & 0xFF);
+
+            byte[] dataBytes = byteTypecast.floatToBytes(value);
+
+            byte[] writeRequest = {WRITE_COMNAND, SDO_LSB, SDO_MSB, 0x00, dataBytes[0], dataBytes[1], dataBytes[2], dataBytes[3]};
+
+            writeSDOAction(bleDevice, writeRequest);
+            readSDOAction(bleDevice);
+        }
     }
 
+
+
+    // Thumb REU SDO Commands
+    private static final byte READ_COMMAND = 0x40; // Read Command: 0x40,  Data: 0x00-00-00-00
+    private static final byte WRITE_COMNAND = 0x22; // Write Command: 0x22, Data: 0xKK-LL-MM-NN [Valid data from BLE App]
+
+    private static final int SW_VERSION_SDO = 0x2003; // SW Version = 0x2003, 0x00, READ_ONLY, UNSIGNED_INT32
+
+    private static final int SDCARD_LOG_ENABLE_SDO = 0x4431; // SD Car log enable
+    private static final byte SDCARD_ENABLE_LOG_COMMAND = 0x01;
+    private static final byte SDCARD_DISABLE_LOG_COMMAND = 0x00;
+
+    private static final int RTC_READ_DATE_SDO = 0x4420; // RTC Read Date = 0x4420, 0x00, READ_ONLY, UNSIGNED_INT32
+    private static final int RTC_READ_TIME_SDO = 0x4421; // RTC Read Time = 0x4421, 0x00, READ_ONLY, UNSIGNED_INT32
+    private static final int RTC_WRITE_DATE_SDO = 0x4422; // RTC Write Date = 0x4422, 0x00, READ_WRITE, UNSIGNED_INT32
+    private static final int RTC_WRITE_TIME_SDO = 0x4423; // RTC Write Time = 0x4423, 0x00, READ_WRITE, UNSIGNED_INT32
+    private static final int RTC_SET_DATE_SDO = 0x4424; // RTC Set Date = 0x4424, 0x00, READ_WRITE, UNSIGNED_INT32
+    private static final int RTC_SET_TIME_SDO = 0x4425; // RTC Set Time = 0x4425, 0x00, READ_WRITE, UNSIGNED_INT32
+
+    private static final int BAT_REMAINING_SDO = 0x4406; // BAT Rem Capacity = 0x4406, 0x00, READ_ONLY, UNSIGNED_INT32
+
+    private static final int SYSTEM_STATE_SDO = 0x2F00;
+    private static final byte SYS_STATE_INITALIZE = 0x00;
+    private static final byte SYS_STATE_PREOP = 0x7F;
+    private static final byte SYS_STATE_OP = 0x05;
+    private static final byte SYS_STATE_RECOVERABLE_FAIL = 0x04;
+    private static final byte SYS_STATE_NON_RECOVER_FAIL = (byte)0x8F; /* unsigned doesn't exist in java... */
+
+
+    // SDO Actions
+    private void getRTC(String address) {
+        Log.d(TAG, "getRTC: get RTC Date and Time");
+
+        mBleServices.readSDO(address, RTC_READ_DATE_SDO); // Have to read date to update time
+        mBleServices.readSDO(address, RTC_READ_TIME_SDO);
+    }
+
+    private void setRTC(String address) {
+        Log.d(TAG, "setRTC: set RTC Time");
+
+        Calendar cal = Calendar.getInstance();
+
+        int dayOfWeek = cal.get( Calendar.DAY_OF_WEEK ) - 1;
+        int day = cal.get( Calendar.DAY_OF_MONTH );
+        int month = cal.get( Calendar.MONTH ) + 1;
+        int year = cal.get( Calendar.YEAR ) - 2000; // In 80 years this will be a bug
+
+        int hour = cal.get( Calendar.HOUR_OF_DAY );
+        int minute = cal.get( Calendar.MINUTE );
+        int second = cal.get( Calendar.SECOND );
+
+        int dateNum = year * 1000000 + month * 10000 +  day * 100 + dayOfWeek; //YYMMDDdd
+        int timeNum = hour * 10000 + minute * 100 + second; //HHmmss
+
+        mBleServices.writeFourByteArraySDO(address, RTC_WRITE_DATE_SDO, byteTypecast.int32ToBytes(dateNum));
+        mBleServices.writeFourByteArraySDO(address, RTC_SET_DATE_SDO, byteTypecast.int32ToBytes(1));
+        mBleServices.writeFourByteArraySDO(address, RTC_SET_DATE_SDO, byteTypecast.int32ToBytes(0));
+        mBleServices.readSDO(address, RTC_READ_DATE_SDO);
+
+        mBleServices.writeFourByteArraySDO(address, RTC_WRITE_TIME_SDO, byteTypecast.int32ToBytes(timeNum) );
+        mBleServices.writeFourByteArraySDO(address, RTC_SET_TIME_SDO, byteTypecast.int32ToBytes(1));
+        mBleServices.readSDO(address, RTC_READ_TIME_SDO);
+    }
+
+    private void getFirmware(String address) {
+        mBleServices.readSDO(address, SW_VERSION_SDO);
+    }
+
+    private void getSDCardLogState(String address) {
+        mBleServices.readSDO(address, SDCARD_LOG_ENABLE_SDO);
+    }
+
+    private void setSDCardLogState(String address, byte state) {
+        mBleServices.writeByteSDO(address, SDCARD_LOG_ENABLE_SDO, state);
+    }
+
+    private void getBattery(String address) {
+        mBleServices.readSDO(address, BAT_REMAINING_SDO);
+    }
+
+    private void getSysStatus(String address) {
+        mBleServices.readSDO(address, SYSTEM_STATE_SDO);
+    }
+
+    // Recycler View
     class recyclerViewHolder extends RecyclerView.Adapter<recyclerViewHolder.ViewHolder> {
         private Context mContext;
 
@@ -853,11 +1272,44 @@ public class MainActivity extends AppCompatActivity {
             notifyItemChanged(mDeviceLocation.get(address));
         }
 
+        @Override
+        public int getItemViewType(int position) {
+            BleDevices generic_device = mDevices.get(position);
+            return generic_device.deviceType;
+        }
+
         @NonNull
         @Override
         public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            View view = LayoutInflater.from(mContext).inflate(R.layout.movesense_device_recycler_item, parent, false);
-            return new ViewHolder(view);
+            View view;
+            ViewHolder viewHolder = null;
+
+            if (viewType == DEVICE_TYPE_MOVESENSE) {
+                view = LayoutInflater.from(mContext).inflate(R.layout.ble_device_recycler_item, parent, false);
+                viewHolder = new MovesenseViewHolder(view);
+            } else if (viewType == DEVICE_TYPE_THUMBREU) {
+                view = LayoutInflater.from(mContext).inflate(R.layout.ble_device_recycler_item, parent, false);
+                viewHolder = new ThumbREUViewHolder(view);
+            }
+
+            return viewHolder;
+        }
+
+        private String systemStateToName(int state) {
+            switch (state) {
+                case SYS_STATE_INITALIZE:
+                    return "Initialising";
+                case SYS_STATE_PREOP:
+                    return "Pre-operational";
+                case SYS_STATE_OP:
+                    return "Operational";
+                case SYS_STATE_RECOVERABLE_FAIL:
+                    return "Recoverable Fail";
+                case SYS_STATE_NON_RECOVER_FAIL:
+                    return "Non-recoverable Fail";
+                default:
+                    return "Unknown";
+            }
         }
 
         private String connectionStateToName(int state) {
@@ -897,133 +1349,198 @@ public class MainActivity extends AppCompatActivity {
         }
 
         @Override
-        public void onBindViewHolder(@NonNull ViewHolder viewHolder, int position) {
-            BleDevices device = mDevices.get(position);
-            viewHolder.address = device.address;
+        public void onBindViewHolder(@NonNull ViewHolder generic_viewHolder, int position) {
+            BleDevices generic_device = mDevices.get(position);
 
-            viewHolder.connectionState.setText(connectionStateToName(device.connectionStatus));
-            viewHolder.statusDot.setColorFilter(connectionStateToColor(device.connectionStatus));
+            generic_viewHolder.address = generic_device.address;
 
-            viewHolder.deviceAddress.setText(device.address);
-            viewHolder.deviceID.setText(device.name);
+            generic_viewHolder.connectionState.setText(connectionStateToName(generic_device.connectionStatus));
+            generic_viewHolder.statusDot.setColorFilter(connectionStateToColor(generic_device.connectionStatus));
 
-            viewHolder.deviceRssi.setText(device.rssi + "dB");
-            viewHolder.deviceFreq.setText(String.valueOf(device.freq));
-            viewHolder.deviceBatt.setText(device.batt + "%");
-
-            switch (device.connectionStatus) {
+            switch (generic_device.connectionStatus) {
                 case bleService.DEVICE_STATE_DISCONNECTED:
-                    viewHolder.connectButton.setText("Connect");
-                    viewHolder.connectButton.setEnabled(true);
-                    viewHolder.connectButton.setBackgroundColor(getColor(R.color.colorAccent));
-                    viewHolder.connectButton.setTextColor(getColor(R.color.colorWhite));
+                    generic_viewHolder.connectButton.setText("Connect");
+                    generic_viewHolder.connectButton.setEnabled(true);
+                    generic_viewHolder.connectButton.setBackgroundColor(getColor(R.color.colorAccent));
+                    generic_viewHolder.connectButton.setTextColor(getColor(R.color.colorWhite));
 
                     break;
                 case bleService.DEVICE_STATE_CONNECTING:
                 case bleService.DEVICE_STATE_INITIALISING:
                 case bleService.DEVICE_STATE_DISCOVERING:
-                    viewHolder.connectButton.setText("Connect");
-                    viewHolder.connectButton.setEnabled(false);
-                    viewHolder.connectButton.setBackgroundColor(getColor(R.color.colorLight));
-                    viewHolder.connectButton.setTextColor(getColor(R.color.colorText));
+                    generic_viewHolder.connectButton.setText("Connect");
+                    generic_viewHolder.connectButton.setEnabled(false);
+                    generic_viewHolder.connectButton.setBackgroundColor(getColor(R.color.colorLight));
+                    generic_viewHolder.connectButton.setTextColor(getColor(R.color.colorText));
                     break;
 
                 case bleService.DEVICE_STATE_ERROR:
-                    viewHolder.connectButton.setText("Reconnect");
-                    viewHolder.connectButton.setEnabled(true);
-                    viewHolder.connectButton.setBackgroundColor(getColor(R.color.colorLight));
-                    viewHolder.connectButton.setTextColor(getColor(R.color.colorBlack));
+                    generic_viewHolder.connectButton.setText("Reconnect");
+                    generic_viewHolder.connectButton.setEnabled(true);
+                    generic_viewHolder.connectButton.setBackgroundColor(getColor(R.color.colorLight));
+                    generic_viewHolder.connectButton.setTextColor(getColor(R.color.colorBlack));
                     break;
 
                 default:
-                    viewHolder.connectButton.setText("Disconnect");
-                    viewHolder.connectButton.setEnabled(true);
-                    viewHolder.connectButton.setBackgroundColor(getColor(R.color.colorAccent));
-                    viewHolder.connectButton.setTextColor(getColor(R.color.colorWhite));
+                    generic_viewHolder.connectButton.setText("Disconnect");
+                    generic_viewHolder.connectButton.setEnabled(true);
+                    generic_viewHolder.connectButton.setBackgroundColor(getColor(R.color.colorAccent));
+                    generic_viewHolder.connectButton.setTextColor(getColor(R.color.colorWhite));
             }
 
-            if (device.itemExpanded) {
-                viewHolder.expandIcon.setImageDrawable(getDrawable(R.drawable.ic_expand_less_black_24dp));
-                viewHolder.mAdditionalDetails.setVisibility(View.VISIBLE);
+            if (generic_device.itemExpanded) {
+                generic_viewHolder.expandIcon.setImageDrawable(getDrawable(R.drawable.ic_expand_less_black_24dp));
+                generic_viewHolder.mAdditionalDetails.setVisibility(View.VISIBLE);
             } else {
-                viewHolder.expandIcon.setImageDrawable(getDrawable(R.drawable.ic_expand_more_black_24dp));
-                viewHolder.mAdditionalDetails.setVisibility(View.GONE);
+                generic_viewHolder.expandIcon.setImageDrawable(getDrawable(R.drawable.ic_expand_more_black_24dp));
+                generic_viewHolder.mAdditionalDetails.setVisibility(View.GONE);
             }
 
-            if (device.connectionStatus == bleService.DEVICE_STATE_ERROR) {
-                viewHolder.connectionState.setText(device.errorMessage);
-                setErrorState(viewHolder);
+            if (generic_device.connectionStatus == bleService.DEVICE_STATE_ERROR) {
+                generic_viewHolder.connectionState.setText(generic_device.errorMessage);
+                setErrorState(generic_viewHolder);
             } else {
-                clearErrorState(viewHolder);
+                clearErrorState(generic_viewHolder);
             }
 
-            if (device.enableEdit) {
-                viewHolder.deviceNameEdit.setEnabled(true);
-                viewHolder.deviceNameEdit.requestFocus();
-                viewHolder.deviceNameEdit.setSelection(viewHolder.deviceNameEdit.getText().length());
+            if (generic_device.enableEdit) {
+                generic_viewHolder.deviceNameEdit.setEnabled(true);
+                generic_viewHolder.deviceNameEdit.requestFocus();
+                generic_viewHolder.deviceNameEdit.setSelection(generic_viewHolder.deviceNameEdit.getText().length());
 
                 InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-                imm.showSoftInput(viewHolder.deviceNameEdit, InputMethodManager.SHOW_IMPLICIT);
+                imm.showSoftInput(generic_viewHolder.deviceNameEdit, InputMethodManager.SHOW_IMPLICIT);
 
-                viewHolder.renameButton.setText("Save");
+                generic_viewHolder.renameButton.setText("Save");
 
-                device.enableEdit = false;
+                generic_device.enableEdit = false;
             }
 
-            if (!device.editing) {
-                viewHolder.deviceNameEdit.setHint(device.name);
-                if (device.friendlyName == null)
-                    viewHolder.deviceNameEdit.setText(device.name);
+            if (!generic_device.editing) {
+                generic_viewHolder.deviceNameEdit.setHint(generic_device.name);
+                if (generic_device.friendlyName == null)
+                    generic_viewHolder.deviceNameEdit.setText(generic_device.name);
                 else
-                    viewHolder.deviceNameEdit.setText(device.friendlyName);
+                    generic_viewHolder.deviceNameEdit.setText(generic_device.friendlyName);
 
-                viewHolder.deviceNameEdit.setEnabled(false);
-                viewHolder.renameButton.setText("Rename");
+                generic_viewHolder.deviceNameEdit.setEnabled(false);
+                generic_viewHolder.renameButton.setText("Rename");
+            }
+
+            // Movesense Specific
+            if (generic_device.deviceType == DEVICE_TYPE_MOVESENSE) {
+                MovesenseDevice device = (MovesenseDevice)generic_device;
+                MovesenseViewHolder viewHolder = (MovesenseViewHolder) generic_viewHolder;
+                viewHolder.deviceAddress.setText(device.address);
+                viewHolder.deviceID.setText(device.name);
+
+                viewHolder.deviceRssi.setText(device.rssi + "dB");
+                viewHolder.deviceFreq.setText(String.valueOf(device.freq));
+                viewHolder.deviceBatt.setText(device.batt + "%");
+            }
+
+            if (generic_device.deviceType == DEVICE_TYPE_THUMBREU) {
+                assert generic_device instanceof ThumbREUDevice;
+                ThumbREUDevice device = (ThumbREUDevice)generic_device;
+
+                assert generic_viewHolder instanceof ThumbREUViewHolder;
+                ThumbREUViewHolder viewHolder = (ThumbREUViewHolder) generic_viewHolder;
+
+
+                viewHolder.address.setText(device.address);
+                viewHolder.fw_version.setText(String.valueOf(device.mFirmware));
+
+                viewHolder.rssi.setText(device.rssi + "dB");
+                viewHolder.battery.setText(device.batt + "%");
+                viewHolder.rtc_time.setText(device.rtc_text);
+                viewHolder.system_state.setText(systemStateToName(device.sys_state));
             }
         }
 
-        private void setErrorState(ViewHolder viewHolder) {
-            viewHolder.cardView.setCardBackgroundColor(getColor(R.color.colorError));
-            viewHolder.deviceNameEdit.setTextColor(getColor(R.color.colorWhite));
-            viewHolder.connectionState.setTextColor(getColor(R.color.colorWhite));
+        private void setErrorState(ViewHolder generic_viewHolder) {
+            generic_viewHolder.cardView.setCardBackgroundColor(getColor(R.color.colorError));
+            generic_viewHolder.deviceNameEdit.setTextColor(getColor(R.color.colorWhite));
+            generic_viewHolder.connectionState.setTextColor(getColor(R.color.colorWhite));
 
-            viewHolder.deviceRssi.setTextColor(getColor(R.color.colorWhite));
-            viewHolder.deviceFreq.setTextColor(getColor(R.color.colorWhite));
-            viewHolder.deviceBatt.setTextColor(getColor(R.color.colorWhite));
+            generic_viewHolder.renameButton.setTextColor(getColor(R.color.colorBlack));
+            generic_viewHolder.renameButton.setBackgroundColor(getColor(R.color.colorLight));
 
-            viewHolder.rssiImage.setColorFilter(ContextCompat.getColor(mContext, R.color.colorWhite));
-            viewHolder.battImage.setColorFilter(ContextCompat.getColor(mContext, R.color.colorWhite));
-            viewHolder.samplesImage.setColorFilter(ContextCompat.getColor(mContext, R.color.colorWhite));
+            if (generic_viewHolder instanceof MovesenseViewHolder) {
+                MovesenseViewHolder viewHolder = (MovesenseViewHolder) generic_viewHolder;
+                viewHolder.deviceRssi.setTextColor(getColor(R.color.colorWhite));
+                viewHolder.deviceFreq.setTextColor(getColor(R.color.colorWhite));
+                viewHolder.deviceBatt.setTextColor(getColor(R.color.colorWhite));
 
-            viewHolder.deviceAddressLabel.setTextColor(getColor(R.color.colorWhite));
-            viewHolder.deviceIdLabel.setTextColor(getColor(R.color.colorWhite));
-            viewHolder.deviceAddress.setTextColor(getColor(R.color.colorWhite));
-            viewHolder.deviceID.setTextColor(getColor(R.color.colorWhite));
+                viewHolder.rssiImage.setColorFilter(ContextCompat.getColor(mContext, R.color.colorWhite));
+                viewHolder.battImage.setColorFilter(ContextCompat.getColor(mContext, R.color.colorWhite));
+                viewHolder.samplesImage.setColorFilter(ContextCompat.getColor(mContext, R.color.colorWhite));
 
-            viewHolder.renameButton.setTextColor(getColor(R.color.colorBlack));
-            viewHolder.renameButton.setBackgroundColor(getColor(R.color.colorLight));
+                viewHolder.deviceAddressLabel.setTextColor(getColor(R.color.colorWhite));
+                viewHolder.deviceIdLabel.setTextColor(getColor(R.color.colorWhite));
+                viewHolder.deviceAddress.setTextColor(getColor(R.color.colorWhite));
+                viewHolder.deviceID.setTextColor(getColor(R.color.colorWhite));
+
+            } else if (generic_viewHolder instanceof ThumbREUViewHolder) {
+                ThumbREUViewHolder viewHolder = (ThumbREUViewHolder)generic_viewHolder;
+
+                viewHolder.rssi.setTextColor(getColor(R.color.colorWhite));
+                viewHolder.battery.setTextColor(getColor(R.color.colorWhite));
+                viewHolder.rtc_time.setTextColor(getColor(R.color.colorWhite));
+
+                viewHolder.rssiImage.setColorFilter(ContextCompat.getColor(mContext, R.color.colorWhite));
+                viewHolder.battImage.setColorFilter(ContextCompat.getColor(mContext, R.color.colorWhite));
+                viewHolder.rtcImage.setColorFilter(ContextCompat.getColor(mContext, R.color.colorWhite));
+
+                viewHolder.adrress_heading.setTextColor(getColor(R.color.colorWhite));
+                viewHolder.address.setTextColor(getColor(R.color.colorWhite));
+                viewHolder.system_heading.setTextColor(getColor(R.color.colorWhite));
+                viewHolder.system_state.setTextColor(getColor(R.color.colorWhite));
+                viewHolder.fw_heading.setTextColor(getColor(R.color.colorWhite));
+                viewHolder.fw_version.setTextColor(getColor(R.color.colorWhite));
+            }
         }
 
-        private void clearErrorState(ViewHolder viewHolder) {
-            viewHolder.cardView.setCardBackgroundColor(getColor(R.color.colorWhite));
-            viewHolder.deviceNameEdit.setTextColor(getColor(R.color.colorPrimary));
-            viewHolder.connectionState.setTextColor(getColor(R.color.colorText));
+        private void clearErrorState(ViewHolder generic_viewHolder) {
+            generic_viewHolder.cardView.setCardBackgroundColor(getColor(R.color.colorWhite));
+            generic_viewHolder.deviceNameEdit.setTextColor(getColor(R.color.colorPrimary));
+            generic_viewHolder.connectionState.setTextColor(getColor(R.color.colorText));
 
-            viewHolder.deviceRssi.setTextColor(getColor(R.color.colorText));
-            viewHolder.deviceFreq.setTextColor(getColor(R.color.colorText));
-            viewHolder.deviceBatt.setTextColor(getColor(R.color.colorText));
+            generic_viewHolder.renameButton.setTextColor(getColor(R.color.colorWhite));
+            generic_viewHolder.renameButton.setBackgroundColor(getColor(R.color.colorAccent));
 
-            viewHolder.rssiImage.setColorFilter(ContextCompat.getColor(mContext, R.color.colorBlack));
-            viewHolder.battImage.setColorFilter(ContextCompat.getColor(mContext, R.color.colorBlack));
-            viewHolder.samplesImage.setColorFilter(ContextCompat.getColor(mContext, R.color.colorBlack));
+            if (generic_viewHolder instanceof MovesenseViewHolder) {
+                MovesenseViewHolder viewHolder = (MovesenseViewHolder)generic_viewHolder;
 
-            viewHolder.deviceAddressLabel.setTextColor(getColor(R.color.colorText));
-            viewHolder.deviceIdLabel.setTextColor(getColor(R.color.colorText));
-            viewHolder.deviceAddress.setTextColor(getColor(R.color.colorText));
-            viewHolder.deviceID.setTextColor(getColor(R.color.colorText));
+                viewHolder.deviceRssi.setTextColor(getColor(R.color.colorText));
+                viewHolder.deviceFreq.setTextColor(getColor(R.color.colorText));
+                viewHolder.deviceBatt.setTextColor(getColor(R.color.colorText));
 
-            viewHolder.renameButton.setTextColor(getColor(R.color.colorWhite));
-            viewHolder.renameButton.setBackgroundColor(getColor(R.color.colorAccent));
+                viewHolder.rssiImage.setColorFilter(ContextCompat.getColor(mContext, R.color.colorBlack));
+                viewHolder.battImage.setColorFilter(ContextCompat.getColor(mContext, R.color.colorBlack));
+                viewHolder.samplesImage.setColorFilter(ContextCompat.getColor(mContext, R.color.colorBlack));
+
+                viewHolder.deviceAddressLabel.setTextColor(getColor(R.color.colorText));
+                viewHolder.deviceIdLabel.setTextColor(getColor(R.color.colorText));
+                viewHolder.deviceAddress.setTextColor(getColor(R.color.colorText));
+                viewHolder.deviceID.setTextColor(getColor(R.color.colorText));
+            } else if (generic_viewHolder instanceof ThumbREUViewHolder) {
+                ThumbREUViewHolder viewHolder = (ThumbREUViewHolder)generic_viewHolder;
+
+                viewHolder.rssi.setTextColor(getColor(R.color.colorText));
+                viewHolder.battery.setTextColor(getColor(R.color.colorText));
+                viewHolder.rtc_time.setTextColor(getColor(R.color.colorText));
+
+                viewHolder.rssiImage.setColorFilter(ContextCompat.getColor(mContext, R.color.colorBlack));
+                viewHolder.battImage.setColorFilter(ContextCompat.getColor(mContext, R.color.colorBlack));
+                viewHolder.rtcImage.setColorFilter(ContextCompat.getColor(mContext, R.color.colorBlack));
+
+                viewHolder.adrress_heading.setTextColor(getColor(R.color.colorText));
+                viewHolder.address.setTextColor(getColor(R.color.colorText));
+                viewHolder.system_heading.setTextColor(getColor(R.color.colorText));
+                viewHolder.system_state.setTextColor(getColor(R.color.colorText));
+                viewHolder.fw_heading.setTextColor(getColor(R.color.colorText));
+                viewHolder.fw_version.setTextColor(getColor(R.color.colorText));
+            }
         }
 
         @Override
@@ -1076,7 +1593,10 @@ public class MainActivity extends AppCompatActivity {
             device.setEditing(!device.editing);
         }
 
+
+        // View holders
         class ViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener {
+            ViewStub additional_details_stub;
             String address;
 
             CardView cardView;
@@ -1084,28 +1604,19 @@ public class MainActivity extends AppCompatActivity {
 
             ImageView statusDot;
             ImageView expandIcon;
-
-            ImageView rssiImage;
-            ImageView battImage;
-            ImageView samplesImage;
+            ImageView deviceIcon;
 
             EditText deviceNameEdit;
 
             TextView connectionState;
-            TextView deviceRssi;
-            TextView deviceFreq;
-            TextView deviceBatt;
-
-            TextView deviceAddressLabel;
-            TextView deviceIdLabel;
-            TextView deviceAddress;
-            TextView deviceID;
 
             Button connectButton;
             Button renameButton;
 
             ViewHolder(@NonNull View itemView) {
                 super(itemView);
+
+                additional_details_stub = (ViewStub)itemView.findViewById(R.id.addition_details_stub);
 
                 mAdditionalDetails = itemView.findViewById(R.id.addition_details);
 
@@ -1125,25 +1636,13 @@ public class MainActivity extends AppCompatActivity {
                 connectionState = itemView.findViewById(R.id.connection_state_id);
                 statusDot = itemView.findViewById(R.id.status_dot);
                 expandIcon = itemView.findViewById(R.id.expand_icon);
-
-                deviceRssi = itemView.findViewById(R.id.rssi_text_view);
-                deviceFreq = itemView.findViewById(R.id.samples_text_view);
-                deviceBatt = itemView.findViewById(R.id.battery_text_view);
-
-                rssiImage = itemView.findViewById(R.id.rssi_image_view);
-                battImage = itemView.findViewById(R.id.batt_image_view);
-                samplesImage = itemView.findViewById(R.id.samples_image_view);
-
-                deviceAddressLabel = itemView.findViewById(R.id.address_Label);
-                deviceIdLabel = itemView.findViewById(R.id.id_label);
-                deviceAddress = itemView.findViewById(R.id.textView_physical);
-                deviceID = itemView.findViewById(R.id.textView_move_id);
+                deviceIcon = itemView.findViewById(R.id.movesense_icon);
 
                 connectButton = itemView.findViewById(R.id.connect_button);
                 renameButton = itemView.findViewById(R.id.rename_button);
 
-                renameButton.setOnClickListener(this);
-                connectButton.setOnClickListener(this);
+                renameButton.setOnClickListener(this::onClick);
+                connectButton.setOnClickListener(this::onClick);
             }
 
             @Override
@@ -1158,5 +1657,85 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         }
+
+        class MovesenseViewHolder extends ViewHolder {
+            TextView deviceRssi;
+            TextView deviceFreq;
+            TextView deviceBatt;
+
+            TextView deviceAddressLabel;
+            TextView deviceIdLabel;
+            TextView deviceAddress;
+            TextView deviceID;
+
+            ImageView rssiImage;
+            ImageView battImage;
+            ImageView samplesImage;
+
+            MovesenseViewHolder(@NonNull View itemView) {
+                super(itemView);
+
+                deviceIcon.setImageDrawable(getDrawable(R.drawable.movesense_icon));
+
+                additional_details_stub.setLayoutResource(R.layout.movesense_additional_details);
+                View additional_details_inflated = additional_details_stub.inflate();
+
+                deviceRssi = additional_details_inflated.findViewById(R.id.rssi_text_view);
+                deviceFreq = additional_details_inflated.findViewById(R.id.freq_value);
+                deviceBatt = additional_details_inflated.findViewById(R.id.rssi_value);
+
+                rssiImage = additional_details_inflated.findViewById(R.id.rssi_image_view);
+                battImage = additional_details_inflated.findViewById(R.id.rssi_image_view);
+                samplesImage = additional_details_inflated.findViewById(R.id.time_image_view);
+
+                deviceAddressLabel = additional_details_inflated.findViewById(R.id.address_Label);
+                deviceIdLabel = additional_details_inflated.findViewById(R.id.id_label);
+                deviceAddress = additional_details_inflated.findViewById(R.id.textView_physical);
+                deviceID = additional_details_inflated.findViewById(R.id.textView_move_id);
+            }
+        }
+
+        class ThumbREUViewHolder extends ViewHolder {
+            TextView rssi;
+            TextView battery;
+            TextView rtc_time;
+
+            ImageView rssiImage;
+            ImageView battImage;
+            ImageView rtcImage;
+
+            TextView adrress_heading;
+            TextView address;
+            TextView system_heading;
+            TextView system_state;
+            TextView fw_heading;
+            TextView fw_version;
+
+            ThumbREUViewHolder(@NonNull View itemView) {
+                super(itemView);
+
+                deviceIcon.setImageDrawable(getDrawable(R.drawable.prosthetic_icon));
+
+                additional_details_stub.setLayoutResource(R.layout.thumbreu_additional_details);
+                View additional_details_inflated = additional_details_stub.inflate();
+
+                address = additional_details_inflated.findViewById(R.id.phy_address_value);
+                adrress_heading = additional_details_inflated.findViewById(R.id.address_heading);
+                system_state = additional_details_inflated.findViewById(R.id.sys_state_value);
+                system_heading = additional_details_inflated.findViewById(R.id.sys_state_heading);
+                fw_version = additional_details_inflated.findViewById(R.id.fw_version_value);
+                fw_heading = additional_details_inflated.findViewById(R.id.fw_version_heading);
+
+                rtc_time = additional_details_inflated.findViewById(R.id.rtc_value);
+                rssi = additional_details_inflated.findViewById(R.id.rssi_value);
+                battery = additional_details_inflated.findViewById(R.id.battery_value);
+
+                rtcImage = additional_details_inflated.findViewById(R.id.time_image_view);
+                rssiImage = additional_details_inflated.findViewById(R.id.rssi_image_view);
+                battImage = additional_details_inflated.findViewById(R.id.battery_image_view);
+
+            }
+        }
     }
+
 }

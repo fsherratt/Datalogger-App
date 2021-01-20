@@ -13,7 +13,7 @@ import android.widget.PopupWindow;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
-public class PopUpClass {
+public class SavePopUpClass {
     private static final String TAG = "PopUpClass";
 
     Button mCancelButton;
@@ -27,7 +27,7 @@ public class PopUpClass {
     // Popup callbacks
     popupCallbacks callback;
 
-    public PopUpClass(Context context) {
+    public SavePopUpClass(Context context) {
         mContext = context;
 
         LayoutInflater inflater = LayoutInflater.from(mContext);
